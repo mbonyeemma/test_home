@@ -29,6 +29,15 @@
         });
     });
 </script>
+<script>
+    $(document).ready(function () {
+        $('#rejectModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget); // Button that triggered the modal
+            var userId = button.data('id'); // Extract info from data-* attributes
+            $(this).find('#rejectUserId').val(userId);
+        });
+    });
+    </script>
 @append
 <div class="box box-info">
 
@@ -63,9 +72,33 @@
                     <td>{{ $st->defensive_driving }}</td>
                     <td>{{ $st->bb_training }}</td>
                     <td>{{ $st->hep_b_immunisation }}</td>
-                    <td><a href="{{ route('staff.edit', $st->id ) }}"><i class="fa fa-fw fa-edit"></i>Activate User</a>&nbsp;
-                        <a href="{{ route('staff.destroy', $st->id ) }}" class="hidden"><i class=" fa fa-fw fa-trash-o"></i>Delete</a>
-                        <a href="{{  url('user/resetpassword',['id' => $st->id]) }}"><i class=" fa fa-user"></i>Change Password</a>
+                    <td>
+                        @if($st->isactive == 0)
+                            @if($st->fullyApproved)
+                                <button class="btn btn-secondary m-2" disabled>
+                                    <i class="fa fa-fw fa-check"></i> Approved
+                                </button>
+                            @elseif($st->hasApproved)
+                                <button class="btn btn-success m-2" disabled>
+                                    <i class="fa fa-fw fa-check"></i> You Approved
+                                </button>
+                            @else
+                                <a class="btn btn-success m-2" href="{{ route('staff.approve', $st->id) }}">
+                                    <i class="fa fa-fw fa-edit"></i> Approve
+                                </a>
+                                <button class="btn btn-warning m-2" data-toggle="modal" data-target="#rejectModal" data-id="{{ $st->id }}">
+                                    <i class="fa fa-fw fa-times"></i> Reject
+                                </button>
+                            @endif
+                        @elseif($st->isactive == 1)
+                            <button class="btn btn-secondary m-2" disabled>
+                                <i class="fa fa-fw fa-check"></i> Approved
+                            </button>
+                        @elseif($st->isactive == 2)
+                            <button class="btn btn-secondary m-2" disabled>
+                                <i class="fa fa-fw fa-ban"></i> Rejected
+                            </button>
+                        @endif
                     </td>
                 </tr>
                 @endforeach
@@ -73,6 +106,33 @@
         </table>
     </div>
     <!-- /.box-body -->
-
-</div>
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog" aria-labelledby="rejectModalLabel">
+    <div class="modal-dialog" role="document">
+      <form method="POST" action="{{ route('staff.rejectWithReason') }}">
+        @csrf
+        <input type="hidden" name="id" id="rejectUserId">
+  
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+            <h4 class="modal-title" id="rejectModalLabel">Reject Staff</h4>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="reason">Reason for Rejection</label>
+              <textarea name="reason" id="reason" class="form-control" rows="3" required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-danger">Reject</button>
+            <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  
 @endsection

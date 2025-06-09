@@ -256,6 +256,26 @@
                 @endrole       
           </ul>
         </li>
+        <li class="treeview">
+          <a href="#"><i class="fa fa-cog"></i> <span>Restrack</span>
+            <span class="pull-right-container">
+                <i class="fa fa-angle-left pull-right"></i>
+              </span>
+          </a>
+          <ul class="treeview-menu">             
+                <li><a href="{{ route('approval.index') }}">Approval Setting</a></li>
+          </ul>
+        </li>
+        <li class="treeview">
+          <a href="#"><i class="fa fa-clipboard"></i> <span>Data Collections</span>
+            <span class="pull-right-container">
+                <i class="fa fa-angle-left pull-right"></i>
+              </span>
+          </a>
+          <ul class="treeview-menu">             
+                <li><a href="">Forms</a></li>
+          </ul>
+        </li>
         @role(['implementing_partner'])
         <li class="active"><a href="{{ route('ip.facility') }}"><i class="fa fa-hospital-o"></i>
           <span>My Hubs</span></a>

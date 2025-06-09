@@ -91,11 +91,19 @@
                      
                   </div>
                 </div>
-                 <div class="form-group">
+                <div class="form-group">
                   <label for="districtid" class="col-sm-2 control-label">{{ Form::label('districtid', 'District') }}</label>
 
                   <div class="col-sm-10">
                     {{ Form::select('districtid', $districtdropdown, null, ['class' => 'form-control']) }}
+                     
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="facility_type" class="col-sm-2 control-label">{{ Form::label('facility_type', 'Facility Type') }}</label>
+
+                  <div class="col-sm-10">
+                    {{ Form::select('facility_type', $facilityType, null, ['class' => 'form-control']) }}
                      
                   </div>
                 </div>

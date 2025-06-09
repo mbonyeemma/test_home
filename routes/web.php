@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\StaffController;
+
 Auth::routes();
 
 Route::group(['middleware' => 'cors'], function () {
@@ -331,3 +333,11 @@ Route::any('/download_data/archive', 'NewDashboardController@getDownload')->name
 //Route::get('/samples/events/start_date/{start_date?}/end_date/{end_date?}','eidrController@events');
 Route::any('/data/archives', 'NewDashboardController@dataarchives')->name('monitor');
 Route::get('staff/mobile/app', 'StaffController@index_mobile');
+// under maintance
+Route::get('/staff/approve/{id}', [StaffController::class, 'approve'])->name('staff.approve');
+Route::post('/staff/reject', [StaffController::class, 'rejectWithReason'])->name('staff.rejectWithReason');
+
+Route::get('approval-settings', 'ApprovalSettingController@index')->name('approval.index');
+Route::post('approval-settings', 'ApprovalSettingController@store')->name('approval.store');
+Route::post('approval-settings/{id}/update', 'ApprovalSettingController@update')->name('approval.update');
+

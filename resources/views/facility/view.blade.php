@@ -36,10 +36,14 @@
           <td>Lab Manager</td>
           <td>{{ $facility->labmanager }}, {{ $facility->labmanagerphonenumber }}</td>
         </tr>
+        <tr>
+          <td>Facility Type</td>
+          <td>{{ $facility->facility_type }}</td>
+        </tr>
         @role(['administrator','national_hub_coordinator']) 
         <tr>
         	<td></td>
-            <td> <a href="{{route('facility.printqr', $facility->id)}}" target="_blank">Print code</a>{!! QrCode::generate($facility->id)!!}</td>
+            <td> <a href="{{route('facility.printqr', $facility->id)}}" target="_blank">Print code</a>{!! QrCode::generate($facility->name)!!}</td>
         </tr>
         @endrole
       </tbody>
