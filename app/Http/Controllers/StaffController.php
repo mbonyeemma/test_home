@@ -3,14 +3,18 @@
 
 namespace App\Http\Controllers;
 
+use App\ApprovalSetting;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
-use Auth;
 use Session;
 
 use \App\Models\LookupType as LookupType;
 use \App\Models\Staff as Staff;
 use \App\Models\User as User;
 use \App\Models\Equipment as Equipment;
+use App\SelfRegApproval;
+use DB;
+use Illuminate\Support\Facades\Auth;
 
 class StaffController extends Controller
 {
@@ -54,7 +58,7 @@ class StaffController extends Controller
 	 * @return \Illuminate\Http\Response
 	 */
 
-	public function index_mobile(Request $request)
+	public function index_mobile_(Request $request)
 	{
 		$where_clause = '';
 		// $query = "SELECT s.id, s.firstname,s.user_id, s.lastname, s.designation, s.hasdrivingpermit, s.hasbbtraining, s.isimmunizedforhb, s.hasdefensiveriding, s.permitexpirydate, s.nationalid, f.name as facility, f.id as hubid, s.othernames,s.emailaddress,s.telephonenumber,s.telephonenumber2,s.telephonenumber3, d.name as district 
@@ -65,13 +69,156 @@ class StaffController extends Controller
 		// ORDER BY s.firstname ASC";
 
 		$query = "SELECT rr.id, rr.name, rr.email, fa.name as 'hubname', rr.telephone_number, rr.driving_permit, 
-		rr.defensive_driving, rr.bb_training, rr.hep_b_immunisation, fa.inchargephonenumber, fa.inchargephonenumber FROM restrackself_reg rr
+		rr.defensive_driving, rr.bb_training, rr.hep_b_immunisation, fa.inchargephonenumber, fa.inchargephonenumber,rr.isactive FROM restrackself_reg rr
 		LEFT JOIN facility fa ON rr.hubid = fa.id";
 		//echo $query;
 		//exit;
 		$staff = \DB::select($query);
 		return view('staff.index_mobile', compact('staff', 'request'));
 	}
+
+	public function index_mobile(Request $request)
+	{
+		$currentUserId = Auth::id();
+	
+		$query = "SELECT rr.id, rr.name, rr.email, fa.name as hubname, rr.telephone_number, 
+			rr.driving_permit, rr.defensive_driving, rr.bb_training, rr.hep_b_immunisation, 
+			fa.inchargephonenumber, rr.isactive 
+			FROM restrackself_reg rr
+			LEFT JOIN facility fa ON rr.hubid = fa.id";
+	
+		$staff = collect(\DB::select($query));
+	
+		$userApprovals = \DB::table('self_reg_approvals')
+			->where('approved_by', $currentUserId)
+			->pluck('self_reg_id')
+			->toArray();
+	
+		$approvalCounts = \DB::table('self_reg_approvals')
+			->select('approved_by', \DB::raw('count(*) as total'))
+			->groupBy('approved_by')
+			->pluck('total', 'approved_by')
+			->toArray();
+			
+		$requiredApprovals = optional(ApprovalSetting::first())->no_of_approval ?: 1;
+	
+		$staff = $staff->map(function ($s) use ($userApprovals, $approvalCounts, $requiredApprovals) {
+			$s->hasApproved = in_array($s->id, $userApprovals);
+			$s->totalApprovals = $approvalCounts[$s->id] ?? 0;
+			$s->fullyApproved = $s->totalApprovals >= $requiredApprovals;
+			return $s;
+		});
+	
+		return view('staff.index_mobile', compact('staff', 'request'));
+	}
+
+
+	public function approve($id)
+	{
+    $self_reg_user = DB::select("SELECT * FROM restrackself_reg WHERE id = ?", [$id]);
+    if (empty($self_reg_user)) {
+        return redirect()->back()->with('error', 'User not found for approval.');
+    }
+
+    $selfReg = $self_reg_user[0];
+    // Get current user
+    $currentUserId = Auth::id();
+
+    // Check if current user already approved
+    $alreadyApproved = SelfRegApproval::where('self_reg_id', $id)
+                                      ->where('approved_by', $currentUserId)
+                                      ->exists();
+
+    if ($alreadyApproved) {
+        return redirect()->back()->with('error', 'You have already approved this registration.');
+    }
+
+    DB::beginTransaction();
+
+    try {
+        // Record this approval
+        SelfRegApproval::create([
+            'self_reg_id' => $id,
+            'approved_by' => $currentUserId,
+        ]);
+
+        // Get required approvals
+        $requiredApprovals = ApprovalSetting::first()->no_of_approval ?? 1;
+
+        // Count how many approvals already
+        $approvalCount = SelfRegApproval::where('self_reg_id', $id)->count();
+
+        if ($approvalCount < $requiredApprovals) {
+            DB::commit();
+            return redirect()->back()->with('info', "Approval recorded. Waiting for {$requiredApprovals} total approvals.");
+        }
+
+        // Enough approvals → create user
+        $user = new User();
+        $user->name = $selfReg->name;
+        $user->email = $selfReg->email;
+        $user->password = $selfReg->password;
+        $user->hubid = $selfReg->hubid;
+        $user->username = $selfReg->username;
+        $user->ref_lab = $selfReg->ref_lab;
+        $user->facilityid = $selfReg->facilityid;
+        $user->organisation_id = $selfReg->organisation_id;
+        $user->healthregionid = $selfReg->healthregionid;
+        $user->save();
+
+        // Update self_reg as active
+        DB::update("UPDATE restrackself_reg SET isactive = 1 WHERE id = ?", [$id]);
+
+        // Send notification
+        try {
+            $client = new Client();
+            $client->post('https://api.cphl.site/idp/send-notification', [
+                'headers' => [
+                    'Authorization' => 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im1ib255ZWVtbWFAeW1haWwuY29tIiwiYXV0aCI6ImNwaGwiLCJkYXRlIjoiMjAyNS0wNC0wN1QwODo0Mjo0Ny43MzRaIiwiaWF0IjoxNzQ0MDE1MzY3fQ.mMh61xjsVC_ybPQo1bpZtcegvU0Rzk8L1iBMI--bZ54',
+                    'Accept'        => 'application/json',
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => [
+                    'username'    => $selfReg->username,
+                    'message'     => 'Hello, your account has been approved.',
+                    'sendChannel' => 'EMAIL',
+                    'operation'   => 'ACCOUNT_APPROVAL',
+                ],
+            ]);
+        } catch (\Exception $notifyEx) {
+            \Log::error('User approved but notification failed', [
+                'user_id' => $user->id,
+                'error'   => $notifyEx->getMessage(),
+            ]);
+        }
+
+        DB::commit();
+        return redirect()->back()->with('success', 'User approved and added successfully.');
+    } catch (\Exception $e) {
+		dd($e);
+        DB::rollBack();
+        return redirect()->back()->with('error', 'Approval failed: ' . $e->getMessage());
+    }
+}
+	
+	public function rejectWithReason(Request $request)
+{
+    $request->validate([
+        'id' => 'required|exists:restrackself_reg,id',
+        'reason' => 'required|string|max:1000',
+    ]);
+
+    // Update record
+    \DB::table('restrackself_reg')
+        ->where('id', $request->id)
+        ->update([
+            'isactive' => 2,
+            'rejection_reason' => $request->reason,
+        ]);
+
+    return redirect()->back()->with('success', 'User rejected with reason.');
+}
+
 
 	/**
 	 * Show the form for creating a new resource.

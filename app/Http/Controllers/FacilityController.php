@@ -53,10 +53,11 @@ class FacilityController extends Controller {
      */
     public function create() {
 		$hubsdropdown = getAllHubs();
+    $facility_type =['PFP', 'PNFP', 'Government'];
 		$facilityleveldropdown = array_merge_maintain_keys(array('' => 'Select One'),getAllFacilityLevels());
 		$districtdropdown = array_merge_maintain_keys(array('' => 'Select One'),getAllDistricts());
-		
-       return View('facility.create', compact('hubsdropdown', 'facilityleveldropdown', 'districtdropdown'));
+		$facilityType = array_merge_maintain_keys(array('' => 'Select One'),$facility_type);
+       return View('facility.create', compact('hubsdropdown', 'facilityleveldropdown', 'districtdropdown','facilityType'));
     }
 
     /**
@@ -81,6 +82,7 @@ class FacilityController extends Controller {
 			$facility->labmanager = $request->labmanager;
 			$facility->address = $request->address;
 			$facility->email = $request->email;
+			$facility->facility_type = $request->facility_type;
 			$facility->save();
 			return redirect()->route('facility.show', array('id' => $facility->id));
 
@@ -139,6 +141,7 @@ class FacilityController extends Controller {
 			$facility->incharge = $request->incharge;
 			$facility->labmanagerphonenumber = $request->labmanagerphonenumber;
 			$facility->labmanager = $request->labmanager;
+			$facility->facility_type = $request->facility_type;
 			$facility->save();
 			return redirect()->route('facility.show', array('id' => $facility->id));
 

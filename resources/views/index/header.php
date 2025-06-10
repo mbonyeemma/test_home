@@ -16,7 +16,10 @@
         <ul class="nav navbar-nav">
           
           <!-- User Account Menu -->
-          <li class="dropdown notifications-menu"> <a href="#" class="dropdown-toggle" data-toggle="dropdown"> <?php echo  Auth::user()->name; ?> <span class="caret"></span> </a>
+          <li class="dropdown notifications-menu"> <a href="#" class="dropdown-toggle" data-toggle="dropdown"> 
+            <?php if (Auth::check()) {
+               echo Auth::user()->name;
+            } ?> <span class="caret"></span> </a>
             <ul class="dropdown-menu">
               <li> 
                 <!-- inner menu: contains the actual data -->
@@ -24,7 +27,13 @@
                   <li> <a href="<?php echo url('/logout') ?>"> <i class="fa  fa-sign-out text-aqua"></i> Logout</a>
                     
                   </li>
-                  <li> <a href="<?php echo url('user/resetpassword',['id' => Auth::user()->id]);?>"> <i class="fa fa-user text-yellow"></i> Reset Password </a> </li>
+                  <li> <a href="
+                  <?php
+if (Auth::check()) {
+    echo url('user/resetpassword', ['id' => Auth::user()->id]);
+}
+?>
+                  "> <i class="fa fa-user text-yellow"></i> Reset Password </a> </li>
                 </ul>
               </li>
             </ul>

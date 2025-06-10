@@ -6,3 +6,5 @@
 Homestead.json
 Homestead.yaml
 .env
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
