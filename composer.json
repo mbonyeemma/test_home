@@ -1,0 +1,60 @@
+{
+    "name": "laravel/laravel",
+    "description": "The Laravel Framework.",
+    "keywords": ["framework", "laravel"],
+    "license": "MIT",
+    "type": "project",
+    "require": {
+        "php": ">=5.6.4",
+        "nathanmac/qr-code": "1.*",
+        "inani/messager": "^1.0",
+        "khill/lavacharts": "3.0.*",
+        "laravel/framework": "5.6.*",
+        "laravel/passport": "^7.0",
+        "laravel/tinker": "~1.0",
+        "laravelcollective/html": "^5.4",
+        "maatwebsite/excel": "~2.1.0",
+        "simplesoftwareio/simple-qrcode": "~2",
+        "zizaco/entrust": "5.2.x-dev"
+    },
+    "require-dev": {
+        "fzaninotto/faker": "~1.4",
+        "mockery/mockery": "0.9.*",
+        "phpunit/phpunit": "~6.0"
+    },
+    "autoload": {
+        "classmap": [
+            "database"
+        ],
+		"files": [
+            "app/Includes/dropdownlists.php",
+			"app/Includes/commonfunctions.php"
+        ],
+        "psr-4": {
+            "App\\": "app/",
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-root-package-install": [
+            "php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "php artisan key:generate"
+        ],
+        "post-install-cmd": [
+            "Illuminate\\Foundation\\ComposerScripts::postInstall"
+        ],
+        "post-update-cmd": [
+            "Illuminate\\Foundation\\ComposerScripts::postUpdate"
+        ]
+    },
+	
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "kylekatarnls/update-helper": true
+        }
+    }
+}
