@@ -32,6 +32,3 @@ RUN chown -R www-data:www-data /var/www \
 EXPOSE 9000
 CMD ["php-fpm"]
 
-COPY wait-for.sh /usr/local/bin/wait-for.sh
-RUN chmod +x /usr/local/bin/wait-for.sh
-
