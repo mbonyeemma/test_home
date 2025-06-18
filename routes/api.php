@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\FormController;
 use Illuminate\Http\Request;
 
 /*
@@ -24,9 +25,9 @@ Route::group(['middleware' => 'api'], function () {
 	Route::post('/restrack/update/package/status', 'restrackController@updadePackageStatus');
 	Route::post('/restrack/login/', 'restrackController@login');
 	Route::post('/restrack/create_package/', 'restrackController@createPackage');
-	Route::post('/restrack/deliver_results/', 'restrackController@deliverResults');
+	Route::post('/restrack/deliver_results/', 'restrackController@deliverResults');// add noti
 	Route::post('/restrack/change_password/', 'restrackController@changePassword');
-	Route::post('/restrack/add_more_samples_to_package/', 'restrackController@addMoreSamplesToPackage');
+	Route::post('/restrack/add_more_samples_to_package/', 'restrackController@addMoreSamplesToPackage');// add noti
 	Route::post('/restrack/store_login_location/', 'restrackController@storeLocationLogin');
 	Route::get('/restrack/get/number_of_facilities', 'restrackController@getTotalNumberofFacilitiesAndTesttypes');
 	Route::get('/restrack/get/datepackages/{provided_date}', 'restrackController@getPackagesBeyondDate');
@@ -64,4 +65,6 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack/get/syncpackage/{id}', 'restrackController@getPackagesPerDate_byId');
 	Route::post('/restrack_new/register_user/', 'MobileAppRegistrationController@storeUser');
 	Route::get('/restrack_new/packages_per_hub/', 'restrackController@packagesPerHub');
+
+	Route::get('/forms/{form_id}', [FormController::class, 'api']);
 });

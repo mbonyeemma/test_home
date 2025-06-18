@@ -341,3 +341,15 @@ Route::get('approval-settings', 'ApprovalSettingController@index')->name('approv
 Route::post('approval-settings', 'ApprovalSettingController@store')->name('approval.store');
 Route::post('approval-settings/{id}/update', 'ApprovalSettingController@update')->name('approval.update');
 
+Route::prefix('forms')->group(function () {
+    Route::get('/', 'FormController@index')->name('forms.index');          // List all forms
+    Route::get('/create', 'FormController@create')->name('forms.create');  // Show create form UI
+    Route::post('/', 'FormController@store')->name('forms.store');         // Store new form
+    Route::get('/{form_id}', 'FormController@show')->name('forms.show');   // View specific form
+	// Route::get('/forms/{form_id}/edit', 'FormController@edit')->name('forms.edit');
+	Route::post('/forms/{form_id}/submit', 'FormController@submit')->name('forms.submit');
+	Route::delete('/forms/{form_id}', 'FormController@destroy')->name('forms.destroy');
+	Route::get('forms/{form_id}/edit', 'FormController@edit')->name('forms.edit');
+Route::put('forms/{form_id}', 'FormController@update')->name('forms.update');
+
+});
