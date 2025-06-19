@@ -8,3 +8,7 @@ php artisan serve --host=0.0.0.0 --port=8000
 
 Laravel is now at: http://localhost:8000
 phpMyAdmin is at: http://localhost:8080
+
+---- run tinker to the tables
+(new CreateFormsTable)->up();
+(new CreateFormFieldsTable)->up();

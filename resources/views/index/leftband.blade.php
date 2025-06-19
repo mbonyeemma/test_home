@@ -273,7 +273,8 @@
               </span>
           </a>
           <ul class="treeview-menu">             
-                <li><a href="">Forms</a></li>
+                <li><a href="{{ route('forms.create') }}">Forms</a></li>
+                <li><a href="{{ route('forms.index') }}">list of Forms</a></li>
           </ul>
         </li>
         @role(['implementing_partner'])
