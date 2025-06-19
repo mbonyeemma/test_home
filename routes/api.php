@@ -24,7 +24,7 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack/get/packages/for/{cat}/id/{id?}', 'restrackController@getPackages');
 	Route::post('/restrack/update/package/status', 'restrackController@updadePackageStatus');
 	Route::post('/restrack/login/', 'restrackController@login');
-	Route::post('/restrack/create_package/', 'restrackController@createPackage');
+	Route::post('/restrack/create_package/', 'restrackController@createPackage'); //add noti
 	Route::post('/restrack/deliver_results/', 'restrackController@deliverResults');// add noti
 	Route::post('/restrack/change_password/', 'restrackController@changePassword');
 	Route::post('/restrack/add_more_samples_to_package/', 'restrackController@addMoreSamplesToPackage');// add noti

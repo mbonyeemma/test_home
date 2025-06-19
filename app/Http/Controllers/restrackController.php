@@ -25,6 +25,8 @@ use DB;
 //Importing laravel-permission models
 use App\Models\Role;
 use App\Models\Permission;
+use App\Services\NotificationService;
+use Illuminate\Support\Facades\Log;
 use Validator;
 
 //Enables us to output flash messaging
@@ -42,7 +44,8 @@ class restrackController extends Controller
     {
         $username = $request['username'];
         $password = base64_decode($request['password']);
-        //$password = $request['password'];
+        //dd($password,$request['password']);
+       // $password = $request['password'];
         $facilityid = $request['faicilityid'];
         if (Auth::attempt(array('username' => $username, 'password' => $password))) {
             // $user = User::where('id', '=', Auth::user()->id)->get();
@@ -173,16 +176,17 @@ class restrackController extends Controller
         return response()->json($ret_arr);
     }
 
-    public function createPackage(Request $request)
+    public function createPackage(Request $request,NotificationService $notifier)
     {
         $ret = $messages = array();
         $post_data = $request;
 
         try {
-            \DB::transaction(function () use ($request, $post_data) {
+            \DB::transaction(function () use ($request, $post_data,$notifier) {
                 /*$this->validate($request, [
                     'package' => 'required|exists:barcode'
                 ]);*/
+                
                 $hub_id = getHubforFacility($post_data['facilityid']);
                 $package = new Package;
                 $package_arr = [
@@ -278,6 +282,20 @@ class restrackController extends Controller
                     if (isset($post_data['samples']) && $post_data['samples'] != '') {
                         //save each sample
                         $this->createSamples($post_data, $package->id, $event->id, $hub_id);
+                    }
+                    //add notifications
+                    $facility = Facility::find($package->facilityid);
+
+                    // Check if the hub exists and required values are present
+                    if ($facility) {
+                        $notifier->sendNotification(
+                            $facility->email,
+                            'Hello, package created successfully'
+                        );
+                    } else {
+                        Log::warning('Notification not sent: Hub not found or results missing', [
+                            'facility'      => $package->facilityid,
+                        ]);
                     }
                 }
 
@@ -643,7 +661,7 @@ class restrackController extends Controller
         return response()->json($ret_arr);
     }
 
-    public function deliverResults(Request $request)
+    public function deliverResults(Request $request,NotificationService $notifier)
     {
         /*{"facilityid":20,"delivered_at":"2020-11-15 10:03:03","user_id":"30","results":["pt002","res154","ret587"]}
         */
@@ -659,7 +677,21 @@ class restrackController extends Controller
             $result->created_by = $request['user_id'];
             $result->save();
         }
+        //add notifications
+        $facility = Facility::find($request['facilityid']);
 
+        // Check if the hub exists and required values are present
+        if ($facility && !empty($results_ids)) {
+            $notifier->sendNotification(
+                $facility->email,
+                'Hello, you have received results.'
+            );
+        } else {
+            Log::warning('Notification not sent: Hub not found or results missing', [
+                'facility'      => $request['facilityid'],
+                'results_ids' => $results_ids,
+            ]);
+        }
         $ret_arr['status'] = 200;
         $ret_arr['status_desc'] = 'Results delivered successfully';
         return response()->json($ret_arr);
@@ -685,7 +717,7 @@ class restrackController extends Controller
         }
     }
 
-    public function addMoreSamplesToPackage(Request $request)
+    public function addMoreSamplesToPackage(Request $request,NotificationService $notifier)
     {
         try {
             $package = Package::where('barcode', '=', $request['barcode'])->first();
@@ -704,6 +736,21 @@ class restrackController extends Controller
                 $sample_obj->latest_event_id = $package->latest_event_id;
                 $sample_obj->save();
             }
+            //add notifications
+            $facility = Facility::find($package->facilityid);
+
+            // Check if the hub exists and required values are present
+            if ($facility && !empty($results_ids)) {
+                $notifier->sendNotification(
+                    $facility->email,
+                    'Hello, more sample have been added to the package.'
+                );
+            } else {
+                Log::warning('Notification not sent: Hub not found or results missing', [
+                    'Facility'      => $package->facilityid,
+                ]);
+            }
+
         } catch (\Exception $e) {
             //\Log::info($e);
             $ret['status'] = 501;
@@ -1245,14 +1292,14 @@ class restrackController extends Controller
         return 1;
     }
 
-    public function createPackage_new(Request $request)
+    public function createPackage_new(Request $request,NotificationService $notifier)
     {
         $ret = $messages = array();
         $post_data = $request;
         // dd($post_data['user_id']);
 
         try {
-            \DB::transaction(function () use ($request, $post_data) {
+            \DB::transaction(function () use ($request, $post_data,$notifier) {
                 /*$this->validate($request, [
                     'package' => 'required|exists:barcode'
                 ]);*/
@@ -1330,6 +1377,20 @@ class restrackController extends Controller
                     if (isset($post_data['samples']) && $post_data['samples'] != '') {
                         //save each sample
                         $this->createSamples($post_data, $package->id, $event->id, $hub_id);
+                    }
+                    //add notifications
+                    $facility = Facility::find($package->facilityid);
+
+                    // Check if the hub exists and required values are present
+                    if ($facility) {
+                        $notifier->sendNotification(
+                            $facility->email,
+                            'Hello, package created successfully'
+                        );
+                    } else {
+                        Log::warning('Notification not sent: Hub not found or results missing', [
+                            'facility'      => $package->facilityid,
+                        ]);
                     }
                 }
             });
