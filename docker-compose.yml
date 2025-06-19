@@ -1,20 +1,13 @@
-# version: '3.8'
+version: '3.8'
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: laravel56-app
     container_name: laravel56-app
-    restart: unless-stopped
-    working_dir: /var/www
     volumes:
       - .:/var/www
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
     environment:
       DB_HOST: db
       DB_PORT: 3306
@@ -22,6 +15,16 @@ services:
       DB_USERNAME: root
       DB_PASSWORD: root
 
+  web:
+    image: nginx:latest
+    container_name: laravel56-nginx
+    ports:
+      - "8090:80"
+    volumes:
+      - .:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
 
   db:
     image: mysql:5.7
@@ -31,7 +34,7 @@ services:
       MYSQL_DATABASE: hub_db
       MYSQL_ROOT_PASSWORD: root
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - dbdata:/var/lib/mysql
 
@@ -40,12 +43,12 @@ services:
     container_name: laravel56-phpmyadmin
     restart: unless-stopped
     ports:
-      - "8090:80"
+      - "8091:80"
     environment:
       PMA_HOST: db
       PMA_PORT: 3306
       MYSQL_ROOT_PASSWORD: root
-      UPLOAD_LIMIT: 256M           # ← increase upload limit here
+      UPLOAD_LIMIT: 256M 
       PHP_UPLOAD_MAX_FILESIZE: 256M
       PHP_POST_MAX_SIZE: 256M
     depends_on:
