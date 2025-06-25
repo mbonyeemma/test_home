@@ -7,24 +7,49 @@ use Illuminate\Http\Request;
 
 class FormController extends Controller
 {
-    // Show create form UI
+    // Show form creation page with listing
     public function create()
     {
-        return view('forms.create');
+        $formId = 'FORM-' . strtoupper(uniqid());
+        $forms = Forms::latest()->get();
+
+        return view('forms.create', compact('formId', 'forms'))->with('formMode', 'create');
     }
 
-    // Store new form and fields
+    // Store new form
     public function store(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'form_id' => 'required|string|max:255|unique:forms,form_id',
-            'fields' => 'required|array|min:1',
         ]);
 
-        $form = Forms::create([
+        Forms::create([
             'name' => $request->name,
             'form_id' => $request->form_id,
+        ]);
+
+        return redirect()->route('forms.create')->with('success', 'Form created successfully.');
+    }
+
+    // Show UI for adding fields to a form
+    public function createFields($form_id)
+    {
+        $form = Forms::where('form_id', $form_id)->firstOrFail();
+        return view('forms.fields-create', compact('form'));
+    }
+
+    // Store fields for a form
+    public function storeFields(Request $request, $form_id)
+    {
+        $form = Forms::where('form_id', $form_id)->firstOrFail();
+
+        $request->validate([
+            'fields' => 'required|array|min:1',
+            'fields.*.field_name' => 'required|string|max:255',
+            'fields.*.field_type' => 'required|in:input,dropdown,checkbox',
+            'fields.*.option' => 'nullable|in:mandatory,optional',
+            'fields.*.status' => 'nullable|in:enabled,disabled',
         ]);
 
         foreach ($request->fields as $field) {
@@ -40,81 +65,75 @@ class FormController extends Controller
             ]);
         }
 
-        return redirect()->route('forms.create')->with('success', 'Form created successfully.');
+        return redirect()->route('forms.fields.create', $form->form_id)
+                         ->with('success', 'Fields added successfully.');
     }
 
-    // Show all forms
-public function index()
-{
-    $forms = Forms::latest()->get(); // or ->paginate(10)
-    return view('forms.index', compact('forms'));
-}
+    // List all forms
+    public function index()
+    {
+        $forms = Forms::with('fields')->latest()->get();
 
-    // Show a single form and its fields
+        return view('forms.index', [
+            'formMode' => 'create',
+            'forms' => $forms,
+        ]);
+    }
+
+    // Show a single form with fields
     public function show($form_id)
     {
         $form = Forms::with('fields')->where('form_id', $form_id)->firstOrFail();
         return view('forms.show', compact('form'));
     }
 
-    // API endpoint for external systems to get form JSON
+    // Provide form JSON API
     public function api($form_id)
     {
         $form = Forms::with('fields')->where('form_id', $form_id)->firstOrFail();
         return response()->json($form);
     }
 
-   public function edit($form_id)
+    // Edit form and load into view
+    public function edit($form_id)
 {
-    $form = Forms::with('fields')->where('form_id', $form_id)->firstOrFail();
-    return view('forms.edit', compact('form'));
+    $form = Forms::where('form_id', $form_id)->firstOrFail();
+    $forms = Forms::latest()->get();
+    $formId = $form->form_id; // keep for consistency
+
+    return view('forms.create', [ // or 'forms.index' depending on your structure
+        'form' => $form,
+        'formId' => $formId,
+        'forms' => $forms,
+        'formMode' => 'edit'
+    ]);
 }
 
-public function update(Request $request, $form_id)
+   public function update(Request $request, $form_id)
 {
     $form = Forms::where('form_id', $form_id)->firstOrFail();
 
     $request->validate([
         'name' => 'required|string|max:255',
-        'fields' => 'required|array|min:1',
+        // Remove 'fields' validation if you're not updating them here
     ]);
 
     $form->update([
         'name' => $request->name,
     ]);
 
-    // Delete old fields and re-insert updated
-    $form->fields()->delete();
+    return redirect()->route('forms.create')->with('success', 'Form updated successfully.');
+}
 
-    foreach ($request->fields as $field) {
-        $form->fields()->create([
-            'field_type' => $field['field_type'],
-            'field_name' => $field['field_name'],
-            'field_value' => $field['field_value'] ?? null,
-            'option' => $field['option'] ?? 'optional',
-            'status' => $field['status'] ?? 'enabled',
-            'dropdown_options' => $field['field_type'] === 'dropdown'
-                ? explode(',', $field['dropdown_options'] ?? '')
-                : null,
-        ]);
+
+    // Delete a form and its fields
+    public function destroy($form_id)
+    {
+        $form = Forms::where('form_id', $form_id)->firstOrFail();
+
+        $form->fields()->delete();
+        $form->delete();
+
+        return redirect()->route('forms.create')->with('success', 'Form deleted successfully.');
     }
-
-    return redirect()->route('forms.index')->with('success', 'Form updated successfully.');
-}
-
-
-// Delete the form
-public function destroy($form_id)
-{
-    $form = Forms::where('form_id', $form_id)->firstOrFail();
-
-    // Delete related fields
-    $form->fields()->delete();
-
-    // Delete form
-    $form->delete();
-
-    return redirect()->route('forms.index')
-        ->with('success', 'Form deleted successfully.');
-}
 }

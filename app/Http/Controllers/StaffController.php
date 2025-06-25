@@ -12,6 +12,7 @@ use \App\Models\LookupType as LookupType;
 use \App\Models\Staff as Staff;
 use \App\Models\User as User;
 use \App\Models\Equipment as Equipment;
+use App\Models\Role;
 use App\SelfRegApproval;
 use DB;
 use Illuminate\Support\Facades\Auth;
@@ -165,6 +166,11 @@ class StaffController extends Controller
         $user->organisation_id = $selfReg->organisation_id;
         $user->healthregionid = $selfReg->healthregionid;
         $user->save();
+		$role = Role::where('name', $selfReg->role)->first(); // assuming 'rider' is the role name
+
+		if ($role) {
+			$user->roles()->attach($role->id); // ✅ attach the actual ID
+		}
 
         // Update self_reg as active
         DB::update("UPDATE restrackself_reg SET isactive = 1 WHERE id = ?", [$id]);
@@ -195,7 +201,6 @@ class StaffController extends Controller
         DB::commit();
         return redirect()->back()->with('success', 'User approved and added successfully.');
     } catch (\Exception $e) {
-		dd($e);
         DB::rollBack();
         return redirect()->back()->with('error', 'Approval failed: ' . $e->getMessage());
     }
