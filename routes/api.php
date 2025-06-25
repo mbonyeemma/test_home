@@ -66,5 +66,5 @@ Route::group(['middleware' => 'api'], function () {
 	Route::post('/restrack_new/register_user/', 'MobileAppRegistrationController@storeUser');
 	Route::get('/restrack_new/packages_per_hub/', 'restrackController@packagesPerHub');
 
-	Route::get('/forms/{form_id}', [FormController::class, 'api']);
+	Route::get('/forms/{form_id}', 'FormController@api');
 });
