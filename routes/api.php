@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FormController;
+use App\Http\Controllers\Api\FormApiController;
 use Illuminate\Http\Request;
 
 /*
@@ -66,5 +67,6 @@ Route::group(['middleware' => 'api'], function () {
 	Route::post('/restrack_new/register_user/', 'MobileAppRegistrationController@storeUser');
 	Route::get('/restrack_new/packages_per_hub/', 'restrackController@packagesPerHub');
 
-	Route::get('/forms/{form_id}', 'FormController@api');
+	Route::get('/forms', 'FormApiController@index');
+        Route::get('/forms/{form_id}', 'FormApiController@show');
 });
