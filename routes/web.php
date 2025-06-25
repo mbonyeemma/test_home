@@ -342,14 +342,24 @@ Route::post('approval-settings', 'ApprovalSettingController@store')->name('appro
 Route::post('approval-settings/{id}/update', 'ApprovalSettingController@update')->name('approval.update');
 
 Route::prefix('forms')->group(function () {
-    Route::get('/', 'FormController@index')->name('forms.index');          // List all forms
-    Route::get('/create', 'FormController@create')->name('forms.create');  // Show create form UI
-    Route::post('/', 'FormController@store')->name('forms.store');         // Store new form
-    Route::get('/{form_id}', 'FormController@show')->name('forms.show');   // View specific form
-	// Route::get('/forms/{form_id}/edit', 'FormController@edit')->name('forms.edit');
-	Route::post('/forms/{form_id}/submit', 'FormController@submit')->name('forms.submit');
-	Route::delete('/forms/{form_id}', 'FormController@destroy')->name('forms.destroy');
-	Route::get('forms/{form_id}/edit', 'FormController@edit')->name('forms.edit');
+Route::get('/', 'FormController@index')->name('forms.index');          // List all forms
+Route::get('/create', 'FormController@create')->name('forms.create');  // Show create form UI
+Route::post('/', 'FormController@store')->name('forms.store');         // Store new form
+Route::get('/{form_id}', 'FormController@show')->name('forms.show');   // View specific form
+// Route::get('/forms/{form_id}/edit', 'FormController@edit')->name('forms.edit');
+Route::post('/forms/{form_id}/submit', 'FormController@submit')->name('forms.submit');
+Route::delete('/forms/{form_id}', 'FormController@destroy')->name('forms.destroy');
+Route::get('forms/{form_id}/edit', 'FormController@edit')->name('forms.edit');
 Route::put('forms/{form_id}', 'FormController@update')->name('forms.update');
+Route::get('/forms/{form_id}/fields/create', 'FormController@createFields')->name('forms.fields.create');
+Route::post('/forms/{form_id}/fields', 'FormController@storeFields')->name('forms.fields.store');
+Route::get('/edit/{form_id}', 'FormController@edit')->name('forms.edit');
+Route::put('/{form_id}', 'FormController@update')->name('forms.update');
+Route::delete('/{form_id}','FormController@destroy')->name('forms.destroy');
+
+Route::get('/form-fields/{field}/edit', 'FormFieldController@edit')->name('form-fields.edit');
+Route::put('/form-fields/{field}', 'FormFieldController@update')->name('form-fields.update');
+Route::delete('/form-fields/{field}','FormFieldController@destroy')->name('form-fields.destroy');
+
 
 });

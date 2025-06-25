@@ -12,7 +12,7 @@ class FormFields extends Model
         'dropdown_options' => 'array',
     ];
 
-    public function form()
+    public function forms()
     {
         return $this->belongsTo(Forms::class);
     }

@@ -1,6 +1,7 @@
-# Use a PHP 7.2 image with FPM
+# Use PHP 7.4 FPM base image
 FROM php:7.4-fpm
 
+# Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -14,21 +15,31 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd mbstring pdo pdo_mysql zip
 
-
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Set working directory
 WORKDIR /var/www
 
+# Copy project files
 COPY . .
 
-# Install PHP dependencies
-RUN composer install
+# Create Laravel cache directories and set permissions
+RUN mkdir -p bootstrap/cache \
+    && mkdir -p storage/framework/{cache,sessions,views} \
+    && chown -R www-data:www-data bootstrap/cache storage \
+    && chmod -R 775 bootstrap/cache storage
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 775 /var/www/storage
+# Set Composer environment settings
+ENV COMPOSER_MEMORY_LIMIT=-1
+ENV COMPOSER_PROCESS_TIMEOUT=900
 
+# Install PHP dependencies with optimized options
+RUN composer install --prefer-dist --no-interaction --no-plugins --no-scripts || \
+    composer install --prefer-dist --no-interaction --no-plugins --no-scripts
+
+# Expose PHP-FPM port
 EXPOSE 9000
-CMD ["php-fpm"]
 
+# Start FPM server
+CMD ["php-fpm"]

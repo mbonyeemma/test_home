@@ -1,94 +1,108 @@
 @extends('layouts.app')
 
-@section('title', '| Create New Form')
+@section('title', 'Forms')
 
 @section('content')
-<div class="container-fluid" style="margin-left: 10%; margin-right: 10%;">
-    <h2>Create New Form</h2>
-    <form action="{{ route('forms.store') }}" method="POST" class="">
-        @csrf
+    <div class="container">
+        <div class="row">
+            <!-- Left column: Form creation -->
+            <div class="col-md-4">
+                <div class="panel panel-default">
+                    <div class="panel-heading"><strong>Create New Form</strong></div>
+                    <div class="panel-heading">
+                        <strong>{{ isset($formMode) && $formMode === 'edit' ? 'Edit Form' : 'Create New Form' }}</strong>
+                    </div>
+                    <div class="panel-body">
+                        @if (session('success'))
+                            <div class="alert alert-success">{{ session('success') }}</div>
+                        @endif
 
-        <div class="form-group">
-            <label>Form Name:</label>
-            <input type="text" name="name" class="form-control" required>
+                        <form
+                            action="{{ isset($formMode) && $formMode === 'edit' ? route('forms.update', $form->form_id) : route('forms.store') }}"
+                            method="POST">
+                            @csrf
+                            @if (isset($formMode) && $formMode === 'edit')
+                                @method('PUT')
+                            @endif
+
+                            <div class="form-group">
+                                <label for="name">Form Name:</label>
+                                <input type="text" name="name" id="name" class="form-control"
+                                    value="{{ old('name', $form->name ?? '') }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="form_id">Form ID:</label>
+                                <input type="text" name="form_id" id="form_id" class="form-control"
+                                    value="{{ old('form_id', $form->form_id ?? $formId) }}"
+                                    {{ isset($formMode) && $formMode === 'edit' ? 'readonly' : 'readonly' }}>
+                            </div>
+
+                            <button type="submit"
+                                class="btn btn-{{ isset($formMode) && $formMode === 'edit' ? 'warning' : 'primary' }} btn-block">
+                                {{ isset($formMode) && $formMode === 'edit' ? 'Update Form' : 'Create Form' }}
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Right column: Form listing -->
+            <div class="col-md-8">
+                <div class="panel panel-info">
+                    <div class="panel-heading"><strong>All Created Forms</strong></div>
+                    <div class="panel-body">
+                        @if ($forms->count())
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Form Name</th>
+                                            <th>Form ID</th>
+                                            <th>Created At</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($forms as $form)
+                                            <tr>
+                                                <td>{{ $loop->iteration }}</td>
+                                                <td>{{ $form->name }}</td>
+                                                <td>{{ $form->form_id }}</td>
+                                                <td>{{ $form->created_at->format('Y-m-d') }}</td>
+                                                <td>
+                                                    <a href="{{ route('forms.fields.create', $form->form_id) }}"
+                                                        class="btn btn-success btn-xs">
+                                                        + Add Fields
+                                                    </a>
+
+                                                    <a href="{{ route('forms.edit', $form->form_id) }}"
+                                                        class="btn btn-warning btn-xs">
+                                                        Edit
+                                                    </a>
+
+                                                    <form action="{{ route('forms.destroy', $form->form_id) }}"
+                                                        method="POST" style="display:inline-block;"
+                                                        onsubmit="return confirm('Are you sure you want to delete this form?');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-danger btn-xs">Delete</button>
+                                                    </form>
+                                                </td>
+                                                wa
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <p class="text-muted">No forms created yet.</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <div class="form-group">
-            <label>Form ID (unique):</label>
-            <input type="text" name="form_id" class="form-control" required>
-        </div>
-
-        <h4>Add Fields</h4>
-
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped" id="fieldsTable">
-                <thead>
-                    <tr>
-                        <th>Field Type</th>
-                        <th>Field Name</th>
-                        <th>Default Value</th>
-                        <th>Dropdown Options</th>
-                        <th>Option</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="fields">
-                    <!-- JS will append field rows here -->
-                </tbody>
-            </table>
-        </div>
-
-        <div class="form-group">
-            <button type="button" class="btn btn-success" onclick="addField()">+ Add Field</button>
-            <button type="submit" class="btn btn-primary">Save Form</button>
-        </div>
-    </form>
-</div>
-
-<script>
-let counter = 0;
-function addField() {
-    const fieldHtml = `
-        <tr>
-            <td>
-                <select name="fields[${counter}][field_type]" class="form-control">
-                    <option value="input">Input</option>
-                    <option value="dropdown">Dropdown</option>
-                    <option value="checkbox">Checkbox</option>
-                </select>
-            </td>
-            <td>
-                <input type="text" name="fields[${counter}][field_name]" class="form-control" placeholder="Field Name">
-            </td>
-            <td>
-                <input type="text" name="fields[${counter}][field_value]" class="form-control" placeholder="Default Value">
-            </td>
-            <td>
-                <input type="text" name="fields[${counter}][dropdown_options]" class="form-control" placeholder="Comma-separated options for dropdown">
-            </td>
-            <td>
-                <select name="fields[${counter}][option]" class="form-control">
-                    <option value="mandatory">Mandatory</option>
-                    <option value="optional">Optional</option>
-                </select>
-            </td>
-            <td>
-                <select name="fields[${counter}][status]" class="form-control">
-                    <option value="enabled">Enabled</option>
-                    <option value="disabled">Disabled</option>
-                </select>
-            </td>
-            <td>
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeField(this)">Remove</button>
-            </td>
-        </tr>`;
-    document.getElementById('fields').insertAdjacentHTML('beforeend', fieldHtml);
-    counter++;
-}
-
-function removeField(button) {
-    button.closest('tr').remove();
-}
-</script>
+    </div>
 @endsection
