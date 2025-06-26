@@ -19,7 +19,8 @@ class FormFieldController extends Controller
         $field = FormFields::findOrFail($id);
 
         $request->validate([
-            'field_name' => 'required|string|max:255',
+            'field_label' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'field_type' => 'required|in:input,dropdown,checkbox',
             'option' => 'nullable|in:mandatory,optional',
             'status' => 'nullable|in:enabled,disabled',
@@ -27,7 +28,8 @@ class FormFieldController extends Controller
 
         $field->update([
             'field_type' => $request->field_type,
-            'field_name' => $request->field_name,
+            'field_label' => $request->field_label,
+            'name' => $request->name,
             'field_value' => $request->field_value,
             'option' => $request->option ?? 'optional',
             'status' => $request->status ?? 'enabled',

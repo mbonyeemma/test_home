@@ -22,11 +22,13 @@ class FormController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'form_id' => 'required|string|max:255|unique:forms,form_id',
+            'formSubmissionUrl' => 'required|url',
         ]);
 
         Forms::create([
             'name' => $request->name,
             'form_id' => $request->form_id,
+            'form_submission_url' => $request->formSubmissionUrl,
         ]);
 
         return redirect()->route('forms.create')->with('success', 'Form created successfully.');
@@ -43,10 +45,10 @@ class FormController extends Controller
     public function storeFields(Request $request, $form_id)
     {
         $form = Forms::where('form_id', $form_id)->firstOrFail();
-
         $request->validate([
             'fields' => 'required|array|min:1',
-            'fields.*.field_name' => 'required|string|max:255',
+            'fields.*.field_label' => 'required|string|max:255',
+            'fields.*.name' => 'required|string|max:255',
             'fields.*.field_type' => 'required|in:input,dropdown,checkbox',
             'fields.*.option' => 'nullable|in:mandatory,optional',
             'fields.*.status' => 'nullable|in:enabled,disabled',
@@ -55,7 +57,8 @@ class FormController extends Controller
         foreach ($request->fields as $field) {
             $form->fields()->create([
                 'field_type' => $field['field_type'],
-                'field_name' => $field['field_name'],
+                'field_label' => $field['field_label'],
+                'name' => $field['name'],
                 'field_value' => $field['field_value'] ?? null,
                 'option' => $field['option'] ?? 'optional',
                 'status' => $field['status'] ?? 'enabled',
@@ -115,11 +118,13 @@ class FormController extends Controller
 
     $request->validate([
         'name' => 'required|string|max:255',
+        'formSubmissionUrl' => 'required|url',
         // Remove 'fields' validation if you're not updating them here
     ]);
 
     $form->update([
         'name' => $request->name,
+        'form_submission_url' => $request->formSubmissionUrl,
     ]);
 
     return redirect()->route('forms.create')->with('success', 'Form updated successfully.');
