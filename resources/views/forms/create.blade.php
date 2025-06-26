@@ -8,7 +8,7 @@
             <!-- Left column: Form creation -->
             <div class="col-md-4">
                 <div class="panel panel-default">
-                    <div class="panel-heading"><strong>Create New Form</strong></div>
+                    {{-- <div class="panel-heading"><strong>Create New Form</strong></div> --}}
                     <div class="panel-heading">
                         <strong>{{ isset($formMode) && $formMode === 'edit' ? 'Edit Form' : 'Create New Form' }}</strong>
                     </div>
@@ -29,6 +29,14 @@
                                 <label for="name">Form Name:</label>
                                 <input type="text" name="name" id="name" class="form-control"
                                     value="{{ old('name', $form->name ?? '') }}" required>
+                            </div>
+
+
+
+                            <div class="form-group">
+                                <label for="formSubmissionUrl">Form Submission URL:</label>
+                                <input type="url" name="formSubmissionUrl" id="formSubmissionUrl" class="form-control"
+                                    value="{{ old('formSubmissionUrl', $form->formSubmissionUrl ?? '') }}" required>
                             </div>
 
                             <div class="form-group">
@@ -60,8 +68,9 @@
                                         <tr>
                                             <th>#</th>
                                             <th>Form Name</th>
+                                            <th>Url</th>
                                             <th>Form ID</th>
-                                            <th>Created At</th>
+                                            {{-- <th>Created At</th> --}}
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -70,8 +79,9 @@
                                             <tr>
                                                 <td>{{ $loop->iteration }}</td>
                                                 <td>{{ $form->name }}</td>
+                                                <td>{{ $form->form_submission_url }}</td>
                                                 <td>{{ $form->form_id }}</td>
-                                                <td>{{ $form->created_at->format('Y-m-d') }}</td>
+                                                {{-- <td>{{ $form->created_at->format('Y-m-d') }}</td> --}}
                                                 <td>
                                                     <a href="{{ route('forms.fields.create', $form->form_id) }}"
                                                         class="btn btn-success btn-xs">
