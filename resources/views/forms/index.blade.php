@@ -125,6 +125,18 @@
                                         class="btn btn-info btn-xs">View</a>
                                     <a href="{{ route('forms.edit', $formItem->form_id) }}"
                                         class="btn btn-warning btn-xs">Edit</a>
+                                    @if ($form->publish_status === 'draft')
+                                        <form method="POST"
+                                            action="{{ route('forms.submitForApproval', $form->form_id) }}">
+                                            @csrf
+                                            <button type="submit" class="btn btn-warning">Submit for Approval</button>
+                                        </form>
+                                    @elseif($form->publish_status === 'pending_approval')
+                                        <form method="POST" action="{{ route('forms.approve', $form->form_id) }}">
+                                            @csrf
+                                            <button type="submit" class="btn btn-success">Approve</button>
+                                        </form>
+                                    @endif
                                     <form method="POST" action="{{ route('forms.destroy', $formItem->form_id) }}"
                                         style="display:inline-block;" onsubmit="return confirm('Are you sure?')">
                                         @csrf

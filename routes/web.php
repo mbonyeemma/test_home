@@ -357,6 +357,10 @@ Route::get('/edit/{form_id}', 'FormController@edit')->name('forms.edit');
 Route::put('/{form_id}', 'FormController@update')->name('forms.update');
 Route::delete('/{form_id}','FormController@destroy')->name('forms.destroy');
 
+Route::post('/forms/{form_id}/submit', 'FormController@submitForApproval')->name('forms.submitForApproval');
+Route::post('/forms/{form_id}/approve', 'FormController@approve')->name('forms.approve');
+
+
 Route::get('/form-fields/{field}/edit', 'FormFieldController@edit')->name('form-fields.edit');
 Route::put('/form-fields/{field}', 'FormFieldController@update')->name('form-fields.update');
 Route::delete('/form-fields/{field}','FormFieldController@destroy')->name('form-fields.destroy');

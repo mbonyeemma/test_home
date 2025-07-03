@@ -60,6 +60,11 @@
             <div class="col-md-8">
                 <div class="panel panel-info">
                     <div class="panel-heading"><strong>All Created Forms</strong></div>
+                    @if (session('success_sa'))
+                        <div class="alert alert-success">{{ session('success_sa') }}</div>
+                    @elseif (session('error_sa'))
+                        <div class="alert alert-danger">{{ session('error_sa') }}</div>
+                    @endif
                     <div class="panel-body">
                         @if ($forms->count())
                             <div class="table-responsive">
@@ -70,7 +75,7 @@
                                             <th>Form Name</th>
                                             <th>Url</th>
                                             <th>Form ID</th>
-                                            {{-- <th>Created At</th> --}}
+                                            <th>Status</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -81,12 +86,28 @@
                                                 <td>{{ $form->name }}</td>
                                                 <td>{{ $form->form_submission_url }}</td>
                                                 <td>{{ $form->form_id }}</td>
-                                                {{-- <td>{{ $form->created_at->format('Y-m-d') }}</td> --}}
+                                                <td>{{ $form->publish_status }}</td>
                                                 <td>
                                                     <a href="{{ route('forms.fields.create', $form->form_id) }}"
                                                         class="btn btn-success btn-xs">
                                                         + Add Fields
                                                     </a>
+
+                                                    @if ($form->publish_status === 'draft')
+                                                        <form method="POST"
+                                                            action="{{ route('forms.submitForApproval', $form->form_id) }}">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-info btn-xs">Submit for
+                                                                Approval</button>
+                                                        </form>
+                                                    @elseif($form->publish_status === 'pending_approval')
+                                                        <form method="POST"
+                                                            action="{{ route('forms.approve', $form->form_id) }}">
+                                                            @csrf
+                                                            <button type="submit"
+                                                                class="btn btn-default btn-xs">Approve</button>
+                                                        </form>
+                                                    @endif
 
                                                     <a href="{{ route('forms.edit', $form->form_id) }}"
                                                         class="btn btn-warning btn-xs">
@@ -101,7 +122,6 @@
                                                         <button type="submit" class="btn btn-danger btn-xs">Delete</button>
                                                     </form>
                                                 </td>
-                                                wa
                                             </tr>
                                         @endforeach
                                     </tbody>
