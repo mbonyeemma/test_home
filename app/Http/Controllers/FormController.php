@@ -72,6 +72,43 @@ class FormController extends Controller
                          ->with('success', 'Fields added successfully.');
     }
 
+   public function submitForApproval($form_id)
+{
+    $form = Forms::where('form_id', $form_id)->firstOrFail();
+
+    if ($form->publish_status !== 'draft') {
+        return redirect()->route('forms.create')->with('error_sa', 'Only draft forms can be submitted.');
+    }
+
+    $form->update([
+        'publish_status' => 'pending_approval',
+        'submitted_by' => auth()->id(),
+    ]);
+
+    return redirect()->route('forms.create')->with('success_sa', 'Form submitted for approval.');
+}
+
+    public function approve($form_id)
+{
+    $form = Forms::where('form_id', $form_id)->firstOrFail();
+
+    if ($form->publish_status !== 'pending_approval') {
+        return redirect()->route('forms.create')->with('error_sa', 'Only pending forms can be approved.');
+    }
+
+    if ($form->submitted_by === auth()->id()) {
+        return redirect()->route('forms.create')->with('error_sa', 'The maker cannot approve their own form.');
+    }
+
+    $form->update([
+        'publish_status' => 'approved',
+        'approved_by' => auth()->id(),
+    ]);
+
+    return redirect()->route('forms.create')->with('success_sa', 'Form approved successfully.');
+}
+
+
     // List all forms
     public function index()
     {
