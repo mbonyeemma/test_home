@@ -2,11 +2,12 @@
 
 namespace App;
 
+use App\Models\Facility;
 use Illuminate\Database\Eloquent\Model;
 
 class Forms extends Model
 {
-    protected $fillable = ['name', 'form_id', 'form_submission_url','publish_status','submitted_by',
+    protected $fillable = ['name', 'form_id', 'facility_id', 'form_submission_url','publish_status','submitted_by',
     'approved_by'];
     public function fields()
     {
@@ -21,4 +22,8 @@ class Forms extends Model
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+    public function facility()
+{
+    return $this->belongsTo(Facility::class);
+}
 }

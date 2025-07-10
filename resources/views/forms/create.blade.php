@@ -31,13 +31,25 @@
                                     value="{{ old('name', $form->name ?? '') }}" required>
                             </div>
 
-
+                            <div class="form-group">
+                                <label for="facility_id">Facility</label>
+                                <select name="facility_id" id="facility_id" class="form-control">
+                                    <option value="">-- Select Facility --</option>
+                                    @foreach ($facilities as $id => $name)
+                                        <option value="{{ $id }}"
+                                            {{ isset($form) && $form->facility_id == $id ? 'selected' : '' }}>
+                                            {{ $name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
 
                             <div class="form-group">
                                 <label for="formSubmissionUrl">Form Submission URL:</label>
                                 <input type="url" name="formSubmissionUrl" id="formSubmissionUrl" class="form-control"
                                     value="{{ old('formSubmissionUrl', $form->formSubmissionUrl ?? '') }}" required>
                             </div>
+
 
                             <div class="form-group">
                                 <label for="form_id">Form ID:</label>
@@ -73,6 +85,7 @@
                                         <tr>
                                             <th>#</th>
                                             <th>Form Name</th>
+                                            <th>Facility</th>
                                             <th>Url</th>
                                             <th>Form ID</th>
                                             <th>Status</th>
@@ -84,6 +97,7 @@
                                             <tr>
                                                 <td>{{ $loop->iteration }}</td>
                                                 <td>{{ $form->name }}</td>
+                                                <td>{{ $form->facility->name ?? 'N/A' }}</td>
                                                 <td>{{ $form->form_submission_url }}</td>
                                                 <td>{{ $form->form_id }}</td>
                                                 <td>{{ $form->publish_status }}</td>
