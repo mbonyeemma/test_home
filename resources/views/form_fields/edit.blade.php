@@ -22,43 +22,59 @@
             @method('PUT')
 
             <div class="form-group">
-                <label>Field Type:</label>
-                <select name="field_type" class="form-control" required>
-                    <option value="input" {{ $field->field_type === 'input' ? 'selected' : '' }}>Input</option>
-                    <option value="dropdown" {{ $field->field_type === 'dropdown' ? 'selected' : '' }}>Dropdown</option>
-                    <option value="checkbox" {{ $field->field_type === 'checkbox' ? 'selected' : '' }}>Checkbox</option>
+                <label for="field_type">Field Type:</label>
+                <select name="field_type" id="field_type" class="form-control" required>
+                    <option value="input" {{ old('field_type', $field->field_type) === 'input' ? 'selected' : '' }}>Input
+                    </option>
+                    <option value="dropdown" {{ old('field_type', $field->field_type) === 'dropdown' ? 'selected' : '' }}>
+                        Dropdown</option>
+                    <option value="checkbox" {{ old('field_type', $field->field_type) === 'checkbox' ? 'selected' : '' }}>
+                        Checkbox</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label>Field Name:</label>
-                <input type="text" name="field_name" class="form-control" value="{{ $field->field_name }}" required>
+                <label for="field_label">Field Label:</label>
+                <input type="text" name="field_label" id="field_label" class="form-control"
+                    value="{{ old('field_label', $field->field_label ?? '') }}" required>
             </div>
 
             <div class="form-group">
-                <label>Default Value:</label>
-                <input type="text" name="field_value" class="form-control" value="{{ $field->field_value }}">
+                <label for="name">Field Name:</label>
+                <input type="text" name="name" id="name" class="form-control"
+                    value="{{ old('name', $field->name ?? '') }}" required>
             </div>
 
             <div class="form-group">
-                <label>Dropdown Options (comma-separated):</label>
-                <input type="text" name="dropdown_options" class="form-control"
-                    value="{{ is_array($field->dropdown_options) ? implode(',', $field->dropdown_options) : $field->dropdown_options }}">
+                <label for="field_value">Default Value:</label>
+                <input type="text" name="field_value" id="field_value" class="form-control"
+                    value="{{ old('field_value', $field->field_value ?? '') }}">
+            </div>
+
+            <div class="form-group" id="dropdown-options-group"
+                style="{{ old('field_type', $field->field_type) !== 'dropdown' ? 'display:none;' : '' }}">
+                <label for="dropdown_options">Dropdown Options (comma-separated):</label>
+                <input type="text" name="dropdown_options" id="dropdown_options" class="form-control"
+                    value="{{ old('dropdown_options', is_array($field->dropdown_options) ? implode(',', $field->dropdown_options) : $field->dropdown_options) }}">
             </div>
 
             <div class="form-group">
-                <label>Option:</label>
-                <select name="option" class="form-control">
-                    <option value="mandatory" {{ $field->option === 'mandatory' ? 'selected' : '' }}>Mandatory</option>
-                    <option value="optional" {{ $field->option === 'optional' ? 'selected' : '' }}>Optional</option>
+                <label for="option">Option:</label>
+                <select name="option" id="option" class="form-control">
+                    <option value="mandatory" {{ old('option', $field->option) === 'mandatory' ? 'selected' : '' }}>
+                        Mandatory</option>
+                    <option value="optional" {{ old('option', $field->option) === 'optional' ? 'selected' : '' }}>Optional
+                    </option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label>Status:</label>
-                <select name="status" class="form-control">
-                    <option value="enabled" {{ $field->status === 'enabled' ? 'selected' : '' }}>Enabled</option>
-                    <option value="disabled" {{ $field->status === 'disabled' ? 'selected' : '' }}>Disabled</option>
+                <label for="status">Status:</label>
+                <select name="status" id="status" class="form-control">
+                    <option value="enabled" {{ old('status', $field->status) === 'enabled' ? 'selected' : '' }}>Enabled
+                    </option>
+                    <option value="disabled" {{ old('status', $field->status) === 'disabled' ? 'selected' : '' }}>Disabled
+                    </option>
                 </select>
             </div>
 
@@ -67,3 +83,20 @@
         </form>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fieldTypeSelect = document.getElementById('field_type');
+            const dropdownOptionsGroup = document.getElementById('dropdown-options-group');
+
+            fieldTypeSelect.addEventListener('change', function() {
+                if (this.value === 'dropdown') {
+                    dropdownOptionsGroup.style.display = 'block';
+                } else {
+                    dropdownOptionsGroup.style.display = 'none';
+                }
+            });
+        });
+    </script>
+@endpush
