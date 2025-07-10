@@ -366,4 +366,8 @@ Route::put('/form-fields/{field}', 'FormFieldController@update')->name('form-fie
 Route::delete('/form-fields/{field}','FormFieldController@destroy')->name('form-fields.destroy');
 
 
+Route::get('/', 'FieldChangeController@index')->name('field-changes.index');
+Route::post('/field-changes/{id}/approve', 'FieldChangeController@approve')->name('field-changes.approve');
+Route::post('/field-changes/{id}/reject', 'FieldChangeController@reject')->name('field-changes.reject');
+
 });
