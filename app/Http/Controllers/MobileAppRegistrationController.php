@@ -93,6 +93,112 @@ class MobileAppRegistrationController extends Controller
     }
 
     /**
+     * Approve user and transfer to users table
+     */
+    public function approveUser($id)
+    {
+        try {
+            // Get the registration record
+            $registration = MobileAppRegistration::findOrFail($id);
+            
+            // Check if user already exists in users table
+            $existingUser = \App\User::where('username', $registration->username)->first();
+            if ($existingUser) {
+                return response()->json([
+                    'status' => 400,
+                    'status_desc' => 'User already exists in system'
+                ]);
+            }
+
+            // Create new user in users table
+            $user = new \App\User();
+            $user->username = $registration->username;
+            $user->name = $registration->name;
+            $user->email = $registration->email;
+            // Transfer the password hash directly without re-bcrypting
+            $user->password = $registration->password;
+            $user->hubid = $registration->hubid;
+            // Note: telephone_number column doesn't exist in users table, so we skip it
+            
+            // Set default values for required fields
+            $user->facilityid = $registration->hubid; // Use hubid as facilityid if not specified
+            $user->ref_lab = null; // Set to null if not specified
+            $user->isactive = 1; // Set user as active
+            
+            $user->save();
+
+            // Update registration status
+            $registration->isactive = 1;
+            $registration->save();
+
+            return response()->json([
+                'status' => 200,
+                'status_desc' => 'User approved and transferred successfully. User can now login.',
+                'user_id' => $user->id,
+                'username' => $user->username,
+                'note' => 'telephone_number stored in registration table only'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 501,
+                'status_desc' => 'Error approving user: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Get pending registrations
+     */
+    public function getPendingRegistrations()
+    {
+        try {
+            $registrations = MobileAppRegistration::where('isactive', 0)->get();
+            return response()->json([
+                'status' => 200,
+                'data' => $registrations
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 501,
+                'status_desc' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Check if user exists in users table (for login verification)
+     */
+    public function checkUserStatus($username)
+    {
+        try {
+            // Check in registration table
+            $registration = MobileAppRegistration::where('username', $username)->first();
+            
+            // Check in users table
+            $user = \App\User::where('username', $username)->first();
+            
+            $status = [
+                'username' => $username,
+                'in_registration_table' => $registration ? true : false,
+                'registration_status' => $registration ? ($registration->isactive ? 'approved' : 'pending') : 'not_found',
+                'in_users_table' => $user ? true : false,
+                'can_login' => $user ? true : false
+            ];
+            
+            return response()->json([
+                'status' => 200,
+                'data' => $status
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 501,
+                'status_desc' => 'Error checking user status: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Display the specified resource.
      *
      * @param  \App\MobileAppRegistration  $mobileAppRegistration

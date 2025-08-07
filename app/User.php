@@ -12,6 +12,13 @@ class User extends Authenticatable
 	use MessageAccessible, TagsCreator;
 
     /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'users';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array
@@ -31,11 +38,17 @@ class User extends Authenticatable
 	
 	public function setPasswordAttribute($password)
 	{   
-		$this->attributes['password'] = bcrypt($password);
+		// If the password is already hashed (starts with $2y$), store it directly
+		if (strpos($password, '$2y$') === 0) {
+			$this->attributes['password'] = $password;
+		} else {
+			// Otherwise, bcrypt the password
+			$this->attributes['password'] = bcrypt($password);
+		}
 	}
 	public function roles()
     {
-        return $this->belongsToMany('App\models\Role');
+        return $this->belongsToMany('App\Models\Role');
     }
     public function organisation()
     {

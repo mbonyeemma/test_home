@@ -43,9 +43,16 @@ class restrackController extends Controller
     public function login(Request $request)
     {
         $username = $request['username'];
-        $password = base64_decode($request['password']);
-        //dd($password,$request['password']);
-       // $password = $request['password'];
+        $password = $request['password'];
+        
+        // Check if password is base64 encoded by trying to decode it
+        $decoded = base64_decode($password, true);
+        if ($decoded !== false && base64_encode($decoded) === $password) {
+            // Password is valid base64, use the decoded version
+            $password = $decoded;
+        }
+        // If not valid base64, use the password as-is (raw password)
+        
         $facilityid = $request['faicilityid'];
         if (Auth::attempt(array('username' => $username, 'password' => $password))) {
             // $user = User::where('id', '=', Auth::user()->id)->get();
