@@ -31,10 +31,64 @@
 </script>
 <script>
     $(document).ready(function () {
+        // Reject modal
         $('#rejectModal').on('show.bs.modal', function (event) {
             var button = $(event.relatedTarget); // Button that triggered the modal
             var userId = button.data('id'); // Extract info from data-* attributes
             $(this).find('#rejectUserId').val(userId);
+        });
+
+        // Approve modal
+        $('#approveModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget); // Button that triggered the modal
+            var userId = button.data('id'); // Extract info from data-* attributes
+            var userName = button.data('name'); // Extract user name
+            $(this).find('#approveUserId').val(userId);
+            $(this).find('#approveUserName').text(userName);
+        });
+
+        // Handle approve button click
+        $('#confirmApproveBtn').on('click', function() {
+            var userId = $('#approveUserId').val();
+            var button = $(this);
+            var originalText = button.text();
+            
+            // Disable button and show loading
+            button.prop('disabled', true).text('Approving...');
+            
+            // Make AJAX call to approve user
+            $.ajax({
+                url: '/api/restrack_new/approve_user/' + userId,
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                success: function(response) {
+                    if (response.status === 200) {
+                        // Show success message
+                        alert('User approved successfully! User can now login.');
+                        // Reload the page to update the table
+                        location.reload();
+                    } else {
+                        alert('Error: ' + response.status_desc);
+                    }
+                },
+                error: function(xhr) {
+                    var errorMessage = 'An error occurred while approving the user.';
+                    if (xhr.responseJSON && xhr.responseJSON.status_desc) {
+                        errorMessage = xhr.responseJSON.status_desc;
+                    }
+                    alert('Error: ' + errorMessage);
+                },
+                complete: function() {
+                    // Re-enable button and restore text
+                    button.prop('disabled', false).text(originalText);
+                    // Close modal
+                    $('#approveModal').modal('hide');
+                }
+            });
         });
     });
     </script>
@@ -83,9 +137,9 @@
                                     <i class="fa fa-fw fa-check"></i> You Approved
                                 </button>
                             @else
-                                <a class="btn btn-success m-2" href="{{ route('staff.approve', $st->id) }}">
-                                    <i class="fa fa-fw fa-edit"></i> Approve
-                                </a>
+                                <button class="btn btn-success m-2" data-toggle="modal" data-target="#approveModal" data-id="{{ $st->id }}" data-name="{{ $st->name }}">
+                                    <i class="fa fa-fw fa-check"></i> Approve
+                                </button>
                                 <button class="btn btn-warning m-2" data-toggle="modal" data-target="#rejectModal" data-id="{{ $st->id }}">
                                     <i class="fa fa-fw fa-times"></i> Reject
                                 </button>
@@ -106,6 +160,35 @@
         </table>
     </div>
     <!-- /.box-body -->
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1" role="dialog" aria-labelledby="approveModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title" id="approveModalLabel">Confirm Approval</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to approve <strong><span id="approveUserName"></span></strong>?</p>
+                <p class="text-info">
+                    <i class="fa fa-info-circle"></i> 
+                    This will transfer the user to the main system and allow them to login.
+                </p>
+                <input type="hidden" id="approveUserId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" id="confirmApproveBtn">
+                    <i class="fa fa-check"></i> Confirm Approval
+                </button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Reject Modal -->
 <div class="modal fade" id="rejectModal" tabindex="-1" role="dialog" aria-labelledby="rejectModalLabel">
     <div class="modal-dialog" role="document">
