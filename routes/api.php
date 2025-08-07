@@ -68,5 +68,5 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack_new/packages_per_hub/', 'restrackController@packagesPerHub');
 
 	Route::get('/forms', 'FormApiController@index');
-    Route::get('/forms/{form_id}', 'FormApiController@show');
+        Route::get('/forms/{form_id}', 'FormApiController@show');
 });
