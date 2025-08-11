@@ -8,16 +8,21 @@ RUN apk add --no-cache \
     zip \
     unzip \
     libpng-dev \
-    libjpeg-dev \
+    jpeg-dev \
     freetype-dev \
     oniguruma-dev \
     libzip-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd mbstring pdo pdo_mysql zip \
-    && apk del --no-cache libpng-dev libjpeg-dev freetype-dev oniguruma-dev libzip-dev
+    && apk add --no-cache \
+        libpng \
+        jpeg \
+        freetype \
+        oniguruma \
+        libzip
 
 # Install Composer
-COPY --from=composer:2.5-alpine /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.4 /usr/bin/composer /usr/bin/composer
 
 # Set working directory
 WORKDIR /var/www
@@ -25,8 +30,8 @@ WORKDIR /var/www
 # Copy composer files first for better layer caching
 COPY composer.json composer.lock ./
 
-# Install PHP dependencies with optimized options
-RUN composer install --prefer-dist --no-interaction --no-plugins --no-scripts --no-dev --optimize-autoloader
+# Install PHP dependencies with optimizations
+RUN composer install --prefer-dist --no-interaction --no-plugins --no-scripts --no-dev --no-autoloader
 
 # Copy project files
 COPY . .
@@ -34,8 +39,10 @@ COPY . .
 # Create Laravel cache directories and set permissions
 RUN mkdir -p bootstrap/cache \
     && mkdir -p storage/framework/{cache,sessions,views} \
+    && mkdir -p storage/logs \
     && chown -R www-data:www-data bootstrap/cache storage \
-    && chmod -R 775 bootstrap/cache storage
+    && chmod -R 775 bootstrap/cache storage \
+    && chmod -R 777 storage/logs
 
 # Optimize PHP settings for production (realistic limits)
 RUN echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/memory-limit.ini \
