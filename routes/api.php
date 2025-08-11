@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 |
 */
 
-Route::group(['middleware' => 'api'], function () {
+Route::group(['middleware' => ['api', 'cors']], function () {
 	Route::get('/events/', 'eidrController@events');
 	Route::get('/restrack/get/data_for/{lookup_type_name}', 'restrackController@getLookUps');
 	Route::get('/restrack/get/place/{lookup_type_name}', 'restrackController@getPlace');
@@ -66,6 +66,10 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack/get/syncpackage/{id}', 'restrackController@getPackagesPerDate_byId');
 	Route::post('/restrack_new/register_user/', 'MobileAppRegistrationController@storeUser');
 	Route::get('/restrack_new/packages_per_hub/', 'restrackController@packagesPerHub');
+	
+	Route::get('/restrack_new/check_user_status/{username}', 'MobileAppRegistrationController@checkUserStatus');
+	Route::get('/restrack_new/pending_registrations/', 'MobileAppRegistrationController@getPendingRegistrations');
+	Route::post('/restrack_new/approve_user/{id}', 'MobileAppRegistrationController@approveUser');
 
 	Route::get('/forms', 'FormApiController@index');
     Route::get('/forms/{form_id}', 'FormApiController@show');
