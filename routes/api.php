@@ -70,6 +70,8 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack_new/check_user_status/{username}', 'MobileAppRegistrationController@checkUserStatus');
 	Route::get('/restrack_new/pending_registrations/', 'MobileAppRegistrationController@getPendingRegistrations');
 	Route::post('/restrack_new/approve_user/{id}', 'MobileAppRegistrationController@approveUser');
+	
+	Route::post('/restrack_new/login/', 'restrackController@login');
 
 	Route::get('/forms', 'FormApiController@index');
     Route::get('/forms/{form_id}', 'FormApiController@show');
