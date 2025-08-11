@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 |
 */
 
-Route::group(['middleware' => ['api', 'cors']], function () {
+Route::group(['middleware' => ['api']], function () {
 	Route::get('/events/', 'eidrController@events');
 	Route::get('/restrack/get/data_for/{lookup_type_name}', 'restrackController@getLookUps');
 	Route::get('/restrack/get/place/{lookup_type_name}', 'restrackController@getPlace');
