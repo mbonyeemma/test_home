@@ -676,41 +676,38 @@ class restrackController extends Controller
         //api/restrack/get/delivered_packages/for/hub/id/3
         
         if ($categrory == 'user') {
-            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, pme.created_at as delivered_at from packagemovement_events pme
-                INNER JOIN package p ON p.latest_event_id = pme.id
-                INNER JOIN facility ef ON(pme.location = ef.id)
+            // Use package.delivered_by field which is set when package is delivered
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE pme.status = 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
-                ORDER BY pme.created_at DESC";
+                WHERE p.delivered_by = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                ORDER BY p.delivered_on DESC";
         } elseif ($categrory == 'facility') {
-            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, pme.created_at as delivered_at from packagemovement_events pme
-                INNER JOIN package p ON p.latest_event_id = pme.id
-                INNER JOIN facility ef ON(pme.location = ef.id)
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE pme.status = 2 AND p.facilityid = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
-                ORDER BY pme.created_at DESC";
+                WHERE p.facilityid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                ORDER BY p.delivered_on DESC";
         } elseif ($categrory == 'hub') {
-            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, pme.created_at as delivered_at from packagemovement_events pme
-                INNER JOIN package p ON p.latest_event_id = pme.id
-                INNER JOIN facility ef ON(pme.location = ef.id)
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE pme.status = 2 AND p.hubid = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
-                ORDER BY pme.created_at DESC";
+                WHERE p.hubid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                ORDER BY p.delivered_on DESC";
         } else {
-            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, pme.created_at as delivered_at from packagemovement_events pme
-                INNER JOIN package p ON p.latest_event_id = pme.id
-                INNER JOIN facility ef ON(pme.location = ef.id)
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE pme.status = 2 AND  pme.created_at between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
-                ORDER BY pme.created_at DESC";
+                WHERE p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                ORDER BY p.delivered_on DESC";
         }
         
         $db_data = \DB::select($query);
