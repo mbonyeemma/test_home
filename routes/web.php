@@ -36,6 +36,7 @@ Route::get("/tracking/facility_list/{hub}", "NewDashboardController@showFaciliti
 Route::any("/not_visited/facility/{hub}", "NewDashboardController@showFacilitesNotVisited");
 
 Route::get("/volume/statistics", "NewDashboardController@totalNumberofSamplesDeliveredAtHub");
+Route::get("/volume/detailed-samples", "NewDashboardController@getDetailedSamplesDeliveredAtHub");
 Route::get("/volume/cphl/statistics", "NewDashboardController@totalNumberofSamplesDeliveredAtCphl");
 
 Route::get('regions/get_district_region/{regionid}', 'NewDashboardController@getDistrictsRegion')->name('region.get_district_region');

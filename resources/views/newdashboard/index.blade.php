@@ -132,32 +132,41 @@
                 {{ Form::select('hubid', $hubs, null,['class'=>'select2 selectdropdown autosubmitsearchform'])}} 
                 <button type="submit" class="btn btn-success btn-sm"><i class="glyphicon glyphicon-download"> Download</i></button> -->
                     <div id="graph"></div>
-                    SUMMARY OF SAMPLES DELIVERED AT HUBS
                     <br>
-                    <!--                 <div class="panel panel-info">                    
-                    <div class="card card-body">
-                        <table id="listtable" class="table table-condensed table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Sample Type</th>
-                                    @foreach($x_axis_data as $months)
-                                    <th>{{ returnFormatedDate($months->month_created) }}</th>               
-                                    @endforeach                              
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($samples as $sample)
-                                    <tr>
-                                        <td>{{ $sample->name }}</td>
-                                        @foreach($x_axis_data as $months)
-                                        <td></td>
-                                        @endforeach    
-                                    </tr> 
-                                @endforeach                               
-                            </tbody>                         
-                        </table>
+                    <h4>SUMMARY OF SAMPLES DELIVERED AT HUBS</h4>
+                    <br>
+                    
+                    <!-- Detailed Samples Table -->
+                    <div class="panel panel-info">
+                        <div class="panel-heading">
+                            <h4>Detailed Sample List (Last 50 Packages)</h4>
+                        </div>
+                        <div class="card card-body">
+                            <div class="box-body table-responsive">
+                                <table id="detailed-samples-table" class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Package ID</th>
+                                            <th>Test Type</th>
+                                            <th>Number of Samples</th>
+                                            <th>Hub Name</th>
+                                            <th>District</th>
+                                            <th>Region</th>
+                                            <th>Package Created</th>
+                                            <th>Delivered At</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="detailed-samples-tbody">
+                                        <tr>
+                                            <td colspan="8" class="text-center">
+                                                <i class="fa fa-spinner fa-spin"></i> Loading sample data...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                </div> -->
                 </div>
             </div>
             <div class="tab-pane" id="4">
@@ -923,7 +932,66 @@
                 $('#volume').html(data);
             }
         });
+        
+        // Load detailed samples data
+        $.ajax({
+            type: 'GET',
+            url: "{{ url('volume/detailed-samples') }}",
+            success: function(data) {
+                var tbody = $('#detailed-samples-tbody');
+                tbody.empty();
+                
+                if (data.length === 0) {
+                    tbody.html('<tr><td colspan="8" class="text-center">No samples found</td></tr>');
+                    return;
+                }
+                
+                data.forEach(function(sample) {
+                    var row = '<tr>' +
+                        '<td>' + sample.package_id + '</td>' +
+                        '<td>' + sample.test_type + '</td>' +
+                        '<td>' + sample.numberofsamples + '</td>' +
+                        '<td>' + sample.hub_name + '</td>' +
+                        '<td>' + (sample.district || 'N/A') + '</td>' +
+                        '<td>' + (sample.region || 'N/A') + '</td>' +
+                        '<td>' + formatDate(sample.package_created) + '</td>' +
+                        '<td>' + formatDate(sample.delivered_at) + '</td>' +
+                        '</tr>';
+                    tbody.append(row);
+                });
+                
+                // Initialize DataTable for the detailed samples table
+                $('#detailed-samples-table').DataTable({
+                    dom: 'Bflrtip',
+                    buttons: [{
+                            extend: 'excelHtml5',
+                            exportOptions: {
+                                columns: ':visible'
+                            }
+                        },
+                        {
+                            extend: 'pdfHtml5',
+                            exportOptions: {
+                                columns: ':visible'
+                            }
+                        },
+                        'colvis'
+                    ],
+                    pageLength: 10,
+                    order: [[6, 'desc']] // Sort by package created date descending
+                });
+            },
+            error: function() {
+                $('#detailed-samples-tbody').html('<tr><td colspan="8" class="text-center text-danger">Error loading sample data</td></tr>');
+            }
+        });
     });
+    
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        var date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
 </script>
 
 <script type="text/javascript">
