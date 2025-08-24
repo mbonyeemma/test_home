@@ -19,7 +19,8 @@ class MobileAppRegistration extends Model
         'driving_permit',
         'defensive_driving',
         'bb_training',
-        'hep_b_immunisation'
+        'hep_b_immunisation',
+        'role'
     ];
 
     public function setPasswordAttribute($password)

@@ -49,6 +49,7 @@ class MobileAppRegistrationController extends Controller
             $user->defensive_driving = $request->defensive_driving;
             $user->bb_training = $request->bb_training;
             $user->hep_b_immunisation = $request->hep_b_immunisation;
+            $user->role = $request->role;
             $user->isactive = 0;
             $user->save();
             
@@ -78,6 +79,7 @@ class MobileAppRegistrationController extends Controller
             $user->defensive_driving = $request->defensive_driving;
             $user->bb_training = $request->bb_training;
             $user->hep_b_immunisation = $request->hep_b_immunisation;
+            $user->role = $request->role;
             $user->isactive = 0;
             $user->save();
             
@@ -127,6 +129,24 @@ class MobileAppRegistrationController extends Controller
             
             $user->save();
 
+            // Assign role to user if role exists in registration
+            if ($registration->role) {
+                // Map registration roles to database roles
+                $roleMapping = [
+                    'rider' => 'sample_transporter',
+                    'driver' => 'driver',
+                    'data_collector' => 'community_user',
+                    'hub_cordinator' => 'hub_coordinator'
+                ];
+                
+                $mappedRoleName = $roleMapping[$registration->role] ?? $registration->role;
+                $role = \App\Models\Role::where('name', $mappedRoleName)->first();
+                
+                if ($role) {
+                    $user->roles()->attach($role->id);
+                }
+            }
+
             // Update registration status
             $registration->isactive = 1;
             $registration->save();
@@ -136,6 +156,8 @@ class MobileAppRegistrationController extends Controller
                 'status_desc' => 'User approved and transferred successfully. User can now login.',
                 'user_id' => $user->id,
                 'username' => $user->username,
+                'role' => $registration->role,
+                'mapped_role' => $mappedRoleName ?? null,
                 'note' => 'telephone_number stored in registration table only'
             ]);
 
