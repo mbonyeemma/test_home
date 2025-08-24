@@ -135,7 +135,7 @@ class MobileAppRegistrationController extends Controller
                 $roleMapping = [
                     'rider' => 'sample_transporter',
                     'driver' => 'driver',
-                    'data_collector' => 'community_user',
+                    'data_collector' => 'data_collector',
                     'hub_cordinator' => 'hub_coordinator'
                 ];
                 
