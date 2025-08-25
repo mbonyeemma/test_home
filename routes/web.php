@@ -347,6 +347,7 @@ Route::get('/', 'FormController@index')->name('forms.index');          // List a
 Route::get('/create', 'FormController@create')->name('forms.create');  // Show create form UI
 Route::post('/', 'FormController@store')->name('forms.store');         // Store new form
 Route::get('/{form_id}', 'FormController@show')->name('forms.show');   // View specific form
+Route::get('/colors', 'FormController@getColors')->name('forms.colors'); // Get available colors
 // Route::get('/forms/{form_id}/edit', 'FormController@edit')->name('forms.edit');
 Route::post('/forms/{form_id}/submit', 'FormController@submit')->name('forms.submit');
 Route::delete('/forms/{form_id}', 'FormController@destroy')->name('forms.destroy');

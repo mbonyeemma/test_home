@@ -69,4 +69,14 @@ class FormApiController extends Controller
             'data' => $form
         ]);
     }
+
+    public function colors()
+    {
+        $forms = Forms::select('form_id', 'name', 'color', 'publish_status')->get();
+        
+        return response()->json([
+            'status' => 'success',
+            'data' => $forms
+        ]);
+    }
 }

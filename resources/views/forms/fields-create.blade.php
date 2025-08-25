@@ -4,7 +4,9 @@
 
 @section('content')
     <div class="container">
-        <h2 class="page-header">Add Fields to Form: <strong>{{ $form->name }}</strong> ({{ $form->form_id }})</h2>
+        <div class="page-header" style="border-left: 4px solid {{ $form->color ?? '#3498db' }}; padding-left: 15px;">
+            <h2>Add Fields to Form: <strong>{{ $form->name }}</strong> ({{ $form->form_id }})</h2>
+        </div>
 
         {{-- Success Messages --}}
         @if (session('pre_success'))
@@ -17,8 +19,8 @@
         @endif
 
         {{-- Add New Fields --}}
-        <div class="panel panel-primary">
-            <div class="panel-heading">
+        <div class="panel panel-primary" style="border-color: {{ $form->color ?? '#3498db' }};">
+            <div class="panel-heading" style="background-color: {{ $form->color ?? '#3498db' }}; border-color: {{ $form->color ?? '#3498db' }};">
                 <strong>Add New Fields</strong>
             </div>
             <div class="panel-body">
@@ -46,7 +48,7 @@
                     <div class="form-group">
                         <div class="col-sm-12">
                             <button type="button" class="btn btn-success" onclick="addField()">+ Add Field</button>
-                            <button type="submit" class="btn btn-primary">Save Fields</button>
+                            <button type="submit" class="btn btn-primary" style="background-color: {{ $form->color ?? '#3498db' }}; border-color: {{ $form->color ?? '#3498db' }};">Save Fields</button>
                             <a href="{{ route('field-changes.index') }}" class="btn btn-default pull-right">
                                 Pending Field Changes -
                                 @if (isset($pendingCount) && $pendingCount > 0)
@@ -60,8 +62,8 @@
         </div>
 
         {{-- Existing Fields --}}
-        <div class="panel panel-info">
-            <div class="panel-heading">
+        <div class="panel panel-info" style="border-color: {{ $form->color ?? '#3498db' }};">
+            <div class="panel-heading" style="background-color: {{ $form->color ?? '#3498db' }}; border-color: {{ $form->color ?? '#3498db' }}; color: white;">
                 <strong>Existing Fields</strong>
             </div>
             <div class="panel-body">
@@ -99,17 +101,18 @@
                                         </td>
                                         <td>{{ ucfirst($field->option) }}</td>
                                         <td>{{ ucfirst($field->status) }}</td>
-                                        <td>{{ ucfirst($field->approval_status) }}</td>
                                         <td>
-                                            <a href="{{ route('form-fields.edit', $field->id) }}"
-                                                class="btn btn-warning btn-xs">Edit</a>
-                                            <form action="{{ route('form-fields.destroy', $field->id) }}" method="POST"
-                                                style="display:inline-block;"
-                                                onsubmit="return confirm('Delete this field?')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button class="btn btn-danger btn-xs">Delete</button>
-                                            </form>
+                                            @if ($field->approval_status === 'approved')
+                                                <span class="label label-success">Approved</span>
+                                            @elseif ($field->approval_status === 'pending')
+                                                <span class="label label-warning">Pending</span>
+                                            @else
+                                                <span class="label label-default">Draft</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <a href="#" class="btn btn-warning btn-xs">Edit</a>
+                                            <a href="#" class="btn btn-danger btn-xs">Delete</a>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -117,52 +120,94 @@
                         </table>
                     </div>
                 @else
-                    <p class="text-muted">No fields found for this form.</p>
+                    <p class="text-muted">No fields added yet.</p>
                 @endif
             </div>
         </div>
     </div>
 
-    {{-- JavaScript --}}
     <script>
-        var counter = 0;
+        let fieldCount = 0;
 
         function addField() {
-            var html = `
-        <tr>
-            <td>
-                <select name="fields[${counter}][field_type]" class="form-control">
-                    <option value="input">Input</option>
-                    <option value="dropdown">Dropdown</option>
-                    <option value="checkbox">Checkbox</option>
-                </select>
-            </td>
-            <td><input name="fields[${counter}][field_label]" class="form-control" required placeholder="Field Label"></td>
-            <td><input name="fields[${counter}][name]" class="form-control" required placeholder="Field Name"></td>
-            <td><input name="fields[${counter}][field_value]" class="form-control" placeholder="Default Value"></td>
-            <td><input name="fields[${counter}][dropdown_options]" class="form-control" placeholder="Comma-separated options"></td>
-            <td>
-                <select name="fields[${counter}][option]" class="form-control">
-                    <option value="mandatory">Mandatory</option>
-                    <option value="optional">Optional</option>
-                </select>
-            </td>
-            <td>
-                <select name="fields[${counter}][status]" class="form-control">
-                    <option value="enabled">Enabled</option>
-                    <option value="disabled">Disabled</option>
-                </select>
-            </td>
-            <td>
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeField(this)">Remove</button>
-            </td>
-        </tr>`;
-            document.getElementById('fields').insertAdjacentHTML('beforeend', html);
-            counter++;
+            const tbody = document.getElementById('fields');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <select name="fields[${fieldCount}][field_type]" class="form-control" onchange="toggleDropdownOptions(${fieldCount})">
+                        <option value="input">Input</option>
+                        <option value="dropdown">Dropdown</option>
+                        <option value="checkbox">Checkbox</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="text" name="fields[${fieldCount}][field_label]" class="form-control" placeholder="Field Label" required>
+                </td>
+                <td>
+                    <input type="text" name="fields[${fieldCount}][name]" class="form-control" placeholder="Field Name" required>
+                </td>
+                <td>
+                    <input type="text" name="fields[${fieldCount}][field_value]" class="form-control" placeholder="Default Value">
+                </td>
+                <td>
+                    <input type="text" name="fields[${fieldCount}][dropdown_options]" class="form-control dropdown-options-${fieldCount}" placeholder="Comma-separated options" style="display: none;">
+                </td>
+                <td>
+                    <select name="fields[${fieldCount}][option]" class="form-control">
+                        <option value="optional">Optional</option>
+                        <option value="mandatory">Mandatory</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="fields[${fieldCount}][status]" class="form-control">
+                        <option value="enabled">Enabled</option>
+                        <option value="disabled">Disabled</option>
+                    </select>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-xs" onclick="removeField(this)">Remove</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+            fieldCount++;
         }
 
         function removeField(button) {
             button.closest('tr').remove();
         }
+
+        function toggleDropdownOptions(fieldIndex) {
+            const fieldType = document.querySelector(`select[name="fields[${fieldIndex}][field_type]"]`).value;
+            const dropdownOptions = document.querySelector(`.dropdown-options-${fieldIndex}`);
+            
+            if (fieldType === 'dropdown') {
+                dropdownOptions.style.display = 'block';
+            } else {
+                dropdownOptions.style.display = 'none';
+            }
+        }
+
+        // Add initial field
+        document.addEventListener('DOMContentLoaded', function() {
+            addField();
+        });
     </script>
+
+    <style>
+        .page-header {
+            background: linear-gradient(135deg, {{ $form->color ?? '#3498db' }}20, {{ $form->color ?? '#3498db' }}10);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .panel-primary > .panel-heading {
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: {{ $form->color ?? '#3498db' }}dd !important;
+            border-color: {{ $form->color ?? '#3498db' }}dd !important;
+        }
+    </style>
 @endsection
