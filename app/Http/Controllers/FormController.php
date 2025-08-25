@@ -56,7 +56,7 @@ class FormController extends Controller
             'form_id' => $request->form_id,
             'form_submission_url' => $request->formSubmissionUrl,
             'facility_id' => $request->facility_id,
-            // 'color' => $color, // Temporarily commented out until database column is added
+            'color' => $color,
         ]);
 
         return redirect()->route('forms.create')->with('success', 'Form created successfully.');
