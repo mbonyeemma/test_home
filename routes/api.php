@@ -74,6 +74,11 @@ Route::group(['middleware' => 'api'], function () {
 	
 	Route::post('/restrack_new/login/', 'restrackController@login');
 
+	// Role switching API routes for mobile app
+	Route::post('/role/switch', 'RoleSwitchController@switchRole');
+	Route::get('/role/current', 'RoleSwitchController@getCurrentRole');
+	Route::get('/role/user-roles', 'RoleSwitchController@getUserRoles');
+
 	Route::get('/forms', 'FormApiController@index');
     Route::get('/forms/{form_id}', 'FormApiController@show');
     Route::get('/forms/approved', 'FormApiController@index_status');

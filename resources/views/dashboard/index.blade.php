@@ -43,6 +43,54 @@
 	
 </script> 
 @append 
+
+<!-- Admin Role Management Widget -->
+@role(['administrator','hub_coordinator','national_hub_coordinator'])
+<div class="row panel-body">
+    <div class="col-md-12">
+        <div class="box box-warning">
+            <div class="box-header with-border">
+                <h3 class="box-title">Role Management</h3>
+                <div class="box-tools pull-right">
+                    <a href="{{ route('users.index') }}" class="btn btn-sm btn-primary">
+                        <i class="fa fa-users"></i> Manage Users
+                    </a>
+                </div>
+            </div>
+            <div class="box-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-box bg-green">
+                            <span class="info-box-icon"><i class="fa fa-user-plus"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Users with Multiple Roles</span>
+                                <span class="info-box-number">
+                                    {{ \App\Models\User::whereRaw('(SELECT COUNT(*) FROM role_user WHERE role_user.user_id = users.id) > 1')->count() }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-box bg-blue">
+                            <span class="info-box-icon"><i class="fa fa-user"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">Total Users</span>
+                                <span class="info-box-number">{{ \App\Models\User::count() }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fa fa-info-circle"></i>
+                    <strong>Role Assignment:</strong> Administrators can assign up to 2 roles per user. 
+                    Users can switch between roles in the mobile app.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endrole
+
 <!-- Info boxes -->
 <div class="row panel-body">
   <div class="btn-group container col-md-12"> @role(['administrator','hub_coordinator','national_hub_coordinator'])
