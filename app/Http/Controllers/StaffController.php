@@ -154,8 +154,18 @@ class StaffController extends Controller
             return redirect()->back()->with('info', "Approval recorded. Waiting for {$requiredApprovals} total approvals.");
         }
 
+        // Check if user already exists in users table before creating
+        $existingUser = \App\Models\User::where('username', $selfReg->username)
+            ->orWhere('email', $selfReg->email)
+            ->first();
+            
+        if ($existingUser) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'User already exists in system. Cannot approve duplicate registration.');
+        }
+        
         // Enough approvals → create user
-        $user = new User();
+        $user = new \App\Models\User();
         $user->name = $selfReg->name;
         $user->email = $selfReg->email;
         $user->password = $selfReg->password;

@@ -10,3 +10,13 @@ Homestead.yaml
 !/storage/framework/views/.gitignore
 database/db_jgibs/hub_db.sql
 hub_db.sql
+
+# Database restore files
+restore_db.sql
+*.sql.restore
+*.sql.backup
+
+# Documentation files for database operations
+ROLE_SWITCHING_CORRECTED_README.md
+*_README.md
+*_CORRECTED_README.md

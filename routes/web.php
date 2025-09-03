@@ -79,6 +79,7 @@ Route::group(['middleware' => 'auth'], function () {
 		"uses" => "SampleReceptionController@processReceipt"
 	));
 	Route::resource('users', 'UserController');
+	
 	Route::resource('samplereceiption', 'SampleReceiptionController');
 	Route::get('message/list/{type}', 'MessageController@index')->name('messages');
 	Route::resource('message', 'MessageController');

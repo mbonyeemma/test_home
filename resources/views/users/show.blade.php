@@ -22,7 +22,24 @@
           <td>Email </td>
           <td>{{ $user->email }}</td>
         </tr>
-       
+        <tr>
+          <td>Roles</td>
+          <td>
+            @if($user->roles->count() > 0)
+              @foreach($user->roles as $role)
+                <span class="label label-primary" style="margin-right: 5px;">
+                  {{ $role->display_name ?: $role->name }}
+                </span>
+                @if($loop->first)
+                  <small class="text-muted">(Primary)</small>
+                @endif
+                @if(!$loop->last)<br>@endif
+              @endforeach
+            @else
+              <span class="text-muted">No roles assigned</span>
+            @endif
+          </td>
+        </tr>
       </tbody>
     </table>
     </div>
