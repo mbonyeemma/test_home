@@ -130,8 +130,8 @@
         {{ Form::label('email', 'Email') }}
         {{ Form::email('email', '', array('class' => 'form-control')) }}
     </div>
-	<h2>Assign Group (Maximum 2)</h2>
-	<p class="text-muted">Select up to 2 roles for this user. The first role will be the primary role.</p>
+	<h2>Assign Roles</h2>
+	<p class="text-muted">Select one or more roles for this user. You can assign as many roles as needed.</p>
     <div class='form-group'>
         @foreach ($roles as $role)
             {{ Form::checkbox('roles[]',  $role->id, null, ['id' => 'role'.$role->id, 'class' => 'role-checkbox'] ) }}
@@ -140,18 +140,7 @@
         @endforeach
     </div>
     
-    <script>
-        // Limit role selection to maximum 2
-        $(document).ready(function() {
-            $('.role-checkbox').change(function() {
-                var checkedRoles = $('.role-checkbox:checked');
-                if (checkedRoles.length > 2) {
-                    $(this).prop('checked', false);
-                    alert('You can only select a maximum of 2 roles.');
-                }
-            });
-        });
-    </script>
+    <!-- Role selection is now unlimited -->
 	<div class="form-group hidden" id="hub">
         {{ Form::label('hubid', 'Hub') }}
         {{ Form::select('hubid', $hubs, null, ['class' => 'form-control']) }}
