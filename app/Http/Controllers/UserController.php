@@ -58,7 +58,7 @@ class UserController extends Controller {
             'name'=>'required|max:120',
             'email'=>'required|email|unique:users',
             'password'=>'required|min:6|confirmed',
-            'roles' => 'required|array|min:1|max:2' // Maximum 2 roles
+            'roles' => 'required|array|min:1' // Allow unlimited roles
         ]);
 		try {
 				$user = new User;
@@ -72,9 +72,8 @@ class UserController extends Controller {
 				$user->save();
 				//$user = User::create($request->only('email', 'name', 'password','hubid','healthregionid','username')); 
 				
-				// Attach roles (maximum 2)
-				$roles = array_slice($request['roles'], 0, 2);
-				$user->roles()->attach($roles);
+				// Attach all selected roles
+				$user->roles()->attach($request['roles']);
 				
 				 return redirect()->route('users.show', array('id' => $user->id))->with('flash_message',
 				 'User successfully added.');
@@ -161,7 +160,7 @@ class UserController extends Controller {
             'name'=>'required|max:120',
             'email'=>'required|email|unique:users,email,'.$id,
             'password'=>'required|min:6|confirmed',
-            'roles' => 'required|array|min:1|max:2' // Maximum 2 roles
+            'roles' => 'required|array|min:1' // Allow unlimited roles
         ]);
        // $input = $request->only(['name', 'email', 'password']); 
         $roles = $request['roles']; //Retreive all roles
@@ -186,8 +185,7 @@ class UserController extends Controller {
 		$user->save();
 
         if (isset($roles)) {        
-            // Limit to maximum 2 roles
-            $roles = array_slice($roles, 0, 2);
+            // Sync all selected roles
             $user->roles()->sync($roles);  //If one or more role is selected associate user to roles          
         }        
         else {
