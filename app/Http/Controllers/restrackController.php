@@ -421,9 +421,9 @@ class restrackController extends Controller
                     $request['test_type'] = $package->test_type;
                     $event = $this->createEvent($request, $package->id, $request['status']);
 
-                    //if the status is 2 (delivered) and the event location is the package's final destination, set the deliverer of the package
+                    //if the status is 2 (delivered), set the deliverer of the package
                     $update_str = '';
-                    if ($request['status']  == 2 && $request['facilityid'] == $package->final_destination) {
+                    if ($request['status']  == 2) {
                         $update_str .= " , delivered_on = '" . $event->created_at . "', delivered_by = " . $request['user_id'];
                     }
                     if ($request['status']  == 3 && $request['facilityid'] == $package->final_destination) {
