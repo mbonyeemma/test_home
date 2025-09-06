@@ -185,22 +185,15 @@ class StaffController extends Controller
         // Update self_reg as active
         DB::update("UPDATE restrackself_reg SET isactive = 1 WHERE id = ?", [$id]);
 
-        // Send notification
+        // Send notification using NotificationService
         try {
-            $client = new Client();
-            $client->post('https://api.cphl.site/idp/send-notification', [
-                'headers' => [
-                    'Authorization' => 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im1ib255ZWVtbWFAeW1haWwuY29tIiwiYXV0aCI6ImNwaGwiLCJkYXRlIjoiMjAyNS0wNC0wN1QwODo0Mjo0Ny43MzRaIiwiaWF0IjoxNzQ0MDE1MzY3fQ.mMh61xjsVC_ybPQo1bpZtcegvU0Rzk8L1iBMI--bZ54',
-                    'Accept'        => 'application/json',
-                    'Content-Type'  => 'application/json',
-                ],
-                'json' => [
-                    'username'    => $selfReg->username,
-                    'message'     => 'Hello, your account has been approved.',
-                    'sendChannel' => 'EMAIL',
-                    'operation'   => 'ACCOUNT_APPROVAL',
-                ],
-            ]);
+            $notifier = new \App\Services\NotificationService();
+            $notifier->sendNotification(
+                $selfReg->username,
+                'Hello, your account has been approved.',
+                'ALL', // Both email and push notification
+                'ACCOUNT_APPROVAL'
+            );
         } catch (\Exception $notifyEx) {
             \Log::error('User approved but notification failed', [
                 'user_id' => $user->id,
