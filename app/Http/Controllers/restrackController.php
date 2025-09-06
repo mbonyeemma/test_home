@@ -1763,11 +1763,27 @@ class restrackController extends Controller
 
             // Save each package to database
             foreach ($packages as $packageData) {
+                // Get the hubid from the facility
+                $facility = \DB::table('facility')->where('id', $packageData['facilityid'])->first();
+                $hubid = $facility ? $facility->hubid : 1; // Default to 1 if facility not found
+                
+                \Log::info('Saving prepared package', [
+                    'barcode' => $packageData['barcode'],
+                    'facilityid' => $packageData['facilityid'],
+                    'hubid' => $hubid,
+                    'facility_found' => $facility ? true : false
+                ]);
+                
                 $packageId = \DB::table('package')->insertGetId([
                     'barcode' => $packageData['barcode'],
                     'facilityid' => $packageData['facilityid'],
+                    'hubid' => $hubid,
                     'final_destination' => '888', // Default destination
                     'created_by' => $packageData['staffId'],
+                    'type' => 1, // Single package type
+                    'numberofsamples' => $packageData['numbeOfSamples'] ?? 1,
+                    'is_tracked_from_facility' => 1,
+                    'is_batch' => 0,
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
