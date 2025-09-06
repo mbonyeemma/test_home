@@ -73,6 +73,9 @@ Route::group(['middleware' => 'api'], function () {
 	Route::post('/restrack_new/approve_user/{id}', 'MobileAppRegistrationController@approveUser');
 	
 	Route::post('/restrack_new/login/', 'restrackController@login');
+	Route::post('/restrack_new/send_package_invitation/', 'restrackController@sendPackageInvitation');
+	Route::post('/restrack_new/save_prepared_packages/', 'restrackController@savePreparedPackages');
+	Route::get('/restrack_new/get_prepared_packages/user/{userId}', 'restrackController@getPreparedPackages');
 
 	// Role switching API routes for mobile app
 	Route::post('/role/switch', 'RoleSwitchController@switchRole');
