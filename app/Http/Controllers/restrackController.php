@@ -469,7 +469,7 @@ class restrackController extends Controller
                                 $facility->email,
                                 $message,
                                 'ALL', // Both email and push notification
-                                'PACKAGE_DELIVERY'
+                                'SAMPLE_DELIVERED'
                             );
                             
                             \Log::info('Package delivery notification sent', [
