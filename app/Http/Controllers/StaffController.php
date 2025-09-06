@@ -191,7 +191,7 @@ class StaffController extends Controller
             $notifier->sendNotification(
                 $selfReg->username,
                 'Hello, your account has been approved.',
-                'ALL', // Both email and push notification
+                'EMAIL', // Email notification only
                 'ACCOUNT_APPROVAL'
             );
         } catch (\Exception $notifyEx) {
