@@ -398,11 +398,14 @@ class restrackController extends Controller
         }
     }
 
-    public function updadePackageStatus_new(Request $request)
+    public function updadePackageStatus_new(Request $request, NotificationService $notifier)
     {
         $ret_arr = array();
+        $delivered_packages = []; // Track packages that were delivered for notifications
+        $delivery_facilities = []; // Track unique facilities for notifications
+        
         try {
-            \DB::transaction(function () use ($request, $ret_arr) {
+            \DB::transaction(function () use ($request, $ret_arr, &$delivered_packages, &$delivery_facilities) {
                 //\Log::info($request);
                 foreach ($request['barcodes'] as $barcode) {
                     $package = Package::where('id', '=', $barcode)->first();
@@ -425,6 +428,10 @@ class restrackController extends Controller
                     $update_str = '';
                     if ($request['status']  == 2) {
                         $update_str .= " , delivered_on = '" . $event->created_at . "', delivered_by = " . $request['user_id'];
+                        
+                        // Track delivered packages for notifications
+                        $delivered_packages[] = $package;
+                        $delivery_facilities[$request['final_destination']] = $request['final_destination'];
                     }
                     if ($request['status']  == 3 && $request['facilityid'] == $package->final_destination) {
                         $update_str .= " , received_at_destination_on = '" . $event->created_at . "', received_by = " . $request['user_id'];
@@ -448,6 +455,45 @@ class restrackController extends Controller
                     \DB::unprepared($query);
                 }
             });
+
+            // Send notifications for delivered packages
+            if ($request['status'] == 2 && !empty($delivered_packages)) {
+                foreach ($delivery_facilities as $facility_id) {
+                    try {
+                        $facility = \App\Models\Facility::find($facility_id);
+                        if ($facility && $facility->email) {
+                            $package_count = count($delivered_packages);
+                            $message = "Hello, you have received {$package_count} package(s) delivered to your facility.";
+                            
+                            $notifier->sendNotification(
+                                $facility->email,
+                                $message,
+                                'ALL', // Both email and push notification
+                                'PACKAGE_DELIVERY'
+                            );
+                            
+                            \Log::info('Package delivery notification sent', [
+                                'facility_id' => $facility_id,
+                                'facility_email' => $facility->email,
+                                'package_count' => $package_count,
+                                'packages' => array_map(function($p) { return $p->barcode; }, $delivered_packages)
+                            ]);
+                        } else {
+                            \Log::warning('Package delivery notification not sent: Facility not found or no email', [
+                                'facility_id' => $facility_id,
+                                'packages' => array_map(function($p) { return $p->barcode; }, $delivered_packages)
+                            ]);
+                        }
+                    } catch (\Exception $notifyEx) {
+                        \Log::error('Package delivery notification failed', [
+                            'facility_id' => $facility_id,
+                            'error' => $notifyEx->getMessage(),
+                            'packages' => array_map(function($p) { return $p->barcode; }, $delivered_packages)
+                        ]);
+                    }
+                }
+            }
+
             $ret['status'] = 200;
             $ret['status_desc'] = 'Package status updated successfully';
             return response()->json($ret);
