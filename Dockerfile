@@ -1,4 +1,3 @@
-
 # Multi-stage build for smaller final image
 FROM php:7.4-fpm-alpine AS base
 

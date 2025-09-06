@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Support\Facades\Http;
 use Auth;
 use App\User;
 use Hash;
@@ -1751,6 +1752,7 @@ class restrackController extends Controller
             $post_data = $request->all();
             $packages = $post_data['packages'] ?? [];
             
+            // Validate input data
             if (empty($packages)) {
                 return response()->json([
                     'status' => 400,
@@ -1758,96 +1760,147 @@ class restrackController extends Controller
                 ], 400);
             }
 
-            $savedPackages = [];
-            $samples = [];
-
-            // Save each package to database
-            foreach ($packages as $packageData) {
-                // Validate and sanitize facilityid
-                $facilityid = $packageData['facilityid'];
-                if ($facilityid === 'unknown' || !is_numeric($facilityid)) {
-                    $facilityid = 1; // Default facility ID
-                    \Log::warning('Invalid facilityid provided, using default', [
-                        'original_facilityid' => $packageData['facilityid'],
-                        'barcode' => $packageData['barcode']
-                    ]);
-                }
-                
-                // Get the hubid from the facility
-                $facility = \DB::table('facility')->where('id', $facilityid)->first();
-                $hubid = $facility ? $facility->hubid : 1; // Default to 1 if facility not found
-                
-                \Log::info('Saving prepared package', [
-                    'barcode' => $packageData['barcode'],
-                    'original_facilityid' => $packageData['facilityid'],
-                    'sanitized_facilityid' => $facilityid,
-                    'hubid' => $hubid,
-                    'facility_found' => $facility ? true : false
-                ]);
-                
-                $packageId = \DB::table('package')->insertGetId([
-                    'barcode' => $packageData['barcode'],
-                    'facilityid' => $facilityid,
-                    'hubid' => $hubid,
-                    'final_destination' => '888', // Default destination
-                    'created_by' => $packageData['staffId'],
-                    'type' => 1, // Single package type
-                    'numberofsamples' => $packageData['numbeOfSamples'] ?? 1,
-                    'is_tracked_from_facility' => 1,
-                    'is_batch' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-
-                // Store package info for notification
-                $savedPackages[] = [
-                    'id' => $packageId,
-                    'barcode' => $packageData['barcode'],
-                    'packageName' => $packageData['packageName'],
-                    'packageType' => $packageData['packageType'],
-                    'facility_name' => $packageData['facility_name']
-                ];
-
-                // Prepare sample data for notification
-                $samples[] = [
-                    'sample_id' => $packageData['barcode'],
-                    'sample_name' => $packageData['packageName']
-                ];
+            // Validate that packages is an array
+            if (!is_array($packages)) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Packages must be an array'
+                ], 400);
             }
 
-            // Send notification using the notification service
-            $notificationData = [
-                'username' => '07123456789', // You might want to get this from the request or user context
-                'title' => 'Pick Samples',
-                'message' => 'Hello, you have been invited to pick packages. Please check the app and test the one you can access.',
-                'sendChannel' => 'app',
-                'operation' => 'INVITE_PICK_SAMPLES',
-                'templateData' => [
-                    'from_facility' => $packages[0]['facility_name'] ?? 'Unknown Facility',
-                    'to_facility' => 'Makerere University Lab', // You might want to make this configurable
-                    'samples' => $samples
-                ]
-            ];
+            $savedPackages = [];
+            $samples = [];
+            $errors = [];
 
-            // Call the notification service
-            $notificationResponse = $this->sendNotificationToService($notificationData);
+            // Save each package to database
+            foreach ($packages as $index => $packageData) {
+                try {
+                    // Validate required fields
+                    if (empty($packageData['barcode'])) {
+                        $errors[] = "Package at index {$index}: Barcode is required";
+                        continue;
+                    }
+
+                    // Check if barcode already exists
+                    $existingPackage = \DB::table('package')->where('barcode', $packageData['barcode'])->first();
+                    if ($existingPackage) {
+                        $errors[] = "Package at index {$index}: Barcode {$packageData['barcode']} already exists";
+                        continue;
+                    }
+
+                    // Validate and sanitize facilityid
+                    $facilityid = $packageData['facilityid'] ?? null;
+                    if ($facilityid === 'unknown' || !is_numeric($facilityid) || empty($facilityid)) {
+                        $facilityid = 1; // Default facility ID
+                        \Log::warning("Invalid facilityid provided, using default. Original: {$packageData['facilityid']}, Barcode: {$packageData['barcode']}");
+                    }
+                    
+                    // Convert to integer to ensure it's numeric
+                    $facilityid = (int) $facilityid;
+                    
+                    // Get the hubid from the facility
+                    $facility = \DB::table('facility')->where('id', $facilityid)->first();
+                    $hubid = $facility ? $facility->hubid : 1; // Default to 1 if facility not found
+                    
+                    \Log::info("Saving prepared package. Barcode: {$packageData['barcode']}, FacilityID: {$facilityid}, HubID: {$hubid}");
+                    
+                    $packageId = \DB::table('package')->insertGetId([
+                        'barcode' => $packageData['barcode'],
+                        'facilityid' => $facilityid,
+                        'hubid' => $hubid,
+                        'final_destination' => $packageData['final_destination'] ?? '888', // Default destination
+                        'created_by' => $packageData['staffId'] ?? 1,
+                        'type' => 1, // Single package type
+                        'numberofsamples' => $packageData['numbeOfSamples'] ?? $packageData['numberOfSamples'] ?? 1,
+                        'is_tracked_from_facility' => 1,
+                        'is_batch' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                    // Store package info for notification
+                    $savedPackages[] = [
+                        'id' => $packageId,
+                        'barcode' => $packageData['barcode'],
+                        'packageName' => $packageData['packageName'] ?? 'Prepared Package',
+                        'packageType' => $packageData['packageType'] ?? 'Unknown',
+                        'facility_name' => $packageData['facility_name'] ?? 'Unknown Facility'
+                    ];
+
+                    // Prepare sample data for notification
+                    $samples[] = [
+                        'sample_id' => $packageData['barcode'],
+                        'sample_name' => $packageData['packageName'] ?? 'Prepared Package'
+                    ];
+
+                } catch (\Exception $e) {
+                    $errors[] = "Package at index {$index}: " . $e->getMessage();
+                    \Log::error("Error saving package at index {$index}: " . $e->getMessage());
+                }
+            }
+
+            // If there were errors and no packages were saved, return error
+            if (empty($savedPackages) && !empty($errors)) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Failed to save any packages',
+                    'errors' => $errors
+                ], 400);
+            }
+
+            // Send notification using the notification service (only if packages were saved)
+            $notificationResponse = null;
+            if (!empty($savedPackages)) {
+                $notificationData = [
+                    'username' => $post_data['username'] ?? '07123456789', // Get from request or use default
+                    'title' => 'Pick Samples',
+                    'message' => 'Hello, you have been invited to pick packages. Please check the app and test the one you can access.',
+                    'sendChannel' => 'app',
+                    'operation' => 'INVITE_PICK_SAMPLES',
+                    'templateData' => [
+                        'from_facility' => $packages[0]['facility_name'] ?? 'Unknown Facility',
+                        'to_facility' => 'Makerere University Lab', // You might want to make this configurable
+                        'samples' => $samples
+                    ]
+                ];
+
+                // Call the notification service
+                $notificationResponse = $this->sendNotificationToService($notificationData);
+            }
             
             \Log::info('Prepared packages saved and notification sent', [
                 'packages_count' => count($savedPackages),
+                'errors_count' => count($errors),
                 'notification_response' => $notificationResponse
             ]);
 
-            return response()->json([
+            $response = [
                 'status' => 200,
-                'message' => 'Prepared packages saved successfully and notifications sent',
+                'message' => 'Prepared packages saved successfully',
                 'data' => [
                     'saved_packages' => $savedPackages,
-                    'notification_response' => $notificationResponse
+                    'saved_count' => count($savedPackages),
+                    'total_requested' => count($packages)
                 ]
-            ]);
+            ];
+
+            // Add errors to response if any
+            if (!empty($errors)) {
+                $response['data']['errors'] = $errors;
+                $response['data']['error_count'] = count($errors);
+            }
+
+            // Add notification response if available
+            if ($notificationResponse) {
+                $response['data']['notification_response'] = $notificationResponse;
+            }
+
+            return response()->json($response);
 
         } catch (\Exception $e) {
-            \Log::error('Error saving prepared packages: ' . $e->getMessage());
+            \Log::error('Error saving prepared packages: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             
             return response()->json([
                 'status' => 500,
@@ -1862,16 +1915,35 @@ class restrackController extends Controller
     private function sendNotificationToService($notificationData)
     {
         try {
-            $response = \Http::post('https://api.cphl.site/idp/send-notification', $notificationData);
+            // Use GuzzleHttp for Laravel 5.6 compatibility
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://api.cphl.site/idp/send-notification', [
+                'json' => $notificationData,
+                'timeout' => 30,
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ]);
+            
+            $statusCode = $response->getStatusCode();
+            $body = $response->getBody()->getContents();
             
             \Log::info('Notification service response', [
-                'status' => $response->status(),
-                'body' => $response->body()
+                'status' => $statusCode,
+                'body' => $body
             ]);
 
             return [
-                'status' => $response->status(),
-                'body' => $response->json()
+                'status' => $statusCode,
+                'body' => json_decode($body, true)
+            ];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            \Log::error('Error sending notification: ' . $e->getMessage());
+            
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage()
             ];
         } catch (\Exception $e) {
             \Log::error('Error sending notification: ' . $e->getMessage());
