@@ -1,26 +1,37 @@
-# Use PHP 7.4 FPM base image
-FROM php:7.4-fpm
+# Multi-stage build for smaller final image
+FROM php:7.4-fpm-alpine AS base
 
 # Install system dependencies and PHP extensions
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     git \
     curl \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libzip-dev \
-    unzip \
     zip \
-    nginx \
+    unzip \
+    libpng-dev \
+    jpeg-dev \
+    freetype-dev \
+    oniguruma-dev \
+    libzip-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd mbstring pdo pdo_mysql zip
+    && docker-php-ext-install -j$(nproc) gd mbstring pdo pdo_mysql zip \
+    && apk add --no-cache \
+        libpng \
+        jpeg \
+        freetype \
+        oniguruma \
+        libzip
 
 # Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.4 /usr/bin/composer /usr/bin/composer
 
 # Set working directory
 WORKDIR /var/www
+
+# Copy composer files first for better layer caching
+COPY composer.json composer.lock ./
+
+# Install PHP dependencies with optimizations
+RUN composer install --prefer-dist --no-interaction --no-plugins --no-scripts --no-dev --no-autoloader
 
 # Copy project files
 COPY . .
@@ -28,22 +39,19 @@ COPY . .
 # Create Laravel cache directories and set permissions
 RUN mkdir -p bootstrap/cache \
     && mkdir -p storage/framework/{cache,sessions,views} \
+    && mkdir -p storage/logs \
     && chown -R www-data:www-data bootstrap/cache storage \
-    && chmod -R 775 bootstrap/cache storage
+    && chmod -R 775 bootstrap/cache storage \
+    && chmod -R 777 storage/logs
 
-# Set Composer environment settings
-ENV COMPOSER_MEMORY_LIMIT=-1
-ENV COMPOSER_PROCESS_TIMEOUT=900
+# Optimize PHP settings for production (realistic limits)
+RUN echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/memory-limit.ini \
+    && echo "max_execution_time = 60" >> /usr/local/etc/php/conf.d/execution-time.ini \
+    && echo "upload_max_filesize = 128M" >> /usr/local/etc/php/conf.d/upload-limit.ini \
+    && echo "post_max_size = 128M" >> /usr/local/etc/php/conf.d/post-limit.ini
 
-# Install PHP dependencies with optimized options
-RUN composer install --prefer-dist --no-interaction --no-plugins --no-scripts || \
-    composer install --prefer-dist --no-interaction --no-plugins --no-scripts
+# Expose PHP-FPM port
+EXPOSE 9000
 
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/sites-available/default
-
-# Expose port 80
-EXPOSE 80
-
-# Start nginx and PHP-FPM
-CMD service nginx start && php-fpm
+# Start FPM server
+CMD ["php-fpm"]
