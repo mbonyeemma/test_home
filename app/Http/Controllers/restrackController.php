@@ -1763,20 +1763,31 @@ class restrackController extends Controller
 
             // Save each package to database
             foreach ($packages as $packageData) {
+                // Validate and sanitize facilityid
+                $facilityid = $packageData['facilityid'];
+                if ($facilityid === 'unknown' || !is_numeric($facilityid)) {
+                    $facilityid = 1; // Default facility ID
+                    \Log::warning('Invalid facilityid provided, using default', [
+                        'original_facilityid' => $packageData['facilityid'],
+                        'barcode' => $packageData['barcode']
+                    ]);
+                }
+                
                 // Get the hubid from the facility
-                $facility = \DB::table('facility')->where('id', $packageData['facilityid'])->first();
+                $facility = \DB::table('facility')->where('id', $facilityid)->first();
                 $hubid = $facility ? $facility->hubid : 1; // Default to 1 if facility not found
                 
                 \Log::info('Saving prepared package', [
                     'barcode' => $packageData['barcode'],
-                    'facilityid' => $packageData['facilityid'],
+                    'original_facilityid' => $packageData['facilityid'],
+                    'sanitized_facilityid' => $facilityid,
                     'hubid' => $hubid,
                     'facility_found' => $facility ? true : false
                 ]);
                 
                 $packageId = \DB::table('package')->insertGetId([
                     'barcode' => $packageData['barcode'],
-                    'facilityid' => $packageData['facilityid'],
+                    'facilityid' => $facilityid,
                     'hubid' => $hubid,
                     'final_destination' => '888', // Default destination
                     'created_by' => $packageData['staffId'],
