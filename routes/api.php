@@ -81,6 +81,7 @@ Route::group(['middleware' => 'api'], function () {
 
 	Route::get('/forms', 'FormApiController@index');
     Route::get('/forms/{form_id}', 'FormApiController@show');
+    Route::post('/forms/save-data', 'FormApiController@saveData');
     Route::get('/forms/approved', 'FormApiController@index_status');
     Route::get('/forms/approved/{form_id}', 'FormApiController@show_status');
     Route::get('/forms/colors', 'FormApiController@colors');

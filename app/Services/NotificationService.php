@@ -19,6 +19,30 @@ class NotificationService
     public function sendNotification($username, $message, $channel = 'EMAIL', $operation = 'ACCOUNT_APPROVAL')
     {
         try {
+            // Handle different channel types
+            if ($channel === 'ALL') {
+                // Send both EMAIL and APP notifications
+                $this->sendEmailNotification($username, $message, $operation);
+                $this->sendPushNotification($username, $message, $operation);
+            } elseif ($channel === 'APP') {
+                // Send push notification only
+                $this->sendPushNotification($username, $message, $operation);
+            } else {
+                // Default to EMAIL (backward compatibility)
+                $this->sendEmailNotification($username, $message, $operation);
+            }
+        } catch (\Exception $e) {
+            Log::error('Notification sending failed', [
+                'username' => $username,
+                'channel'  => $channel,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function sendEmailNotification($username, $message, $operation)
+    {
+        try {
             $this->client->post($this->apiUrl, [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $this->token,
@@ -28,12 +52,44 @@ class NotificationService
                 'json' => [
                     'username'    => $username,
                     'message'     => $message,
-                    'sendChannel' => $channel,
+                    'sendChannel' => 'EMAIL',
                     'operation'   => $operation,
                 ],
             ]);
+            Log::info('Email notification sent successfully', [
+                'username' => $username,
+                'operation' => $operation,
+            ]);
         } catch (\Exception $e) {
-            Log::error('Notification sending failed', [
+            Log::error('Email notification failed', [
+                'username' => $username,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function sendPushNotification($username, $message, $operation)
+    {
+        try {
+            $this->client->post($this->apiUrl, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->token,
+                    'Accept'        => 'application/json',
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => [
+                    'username'    => $username,
+                    'message'     => $message,
+                    'sendChannel' => 'APP',
+                    'operation'   => $operation,
+                ],
+            ]);
+            Log::info('Push notification sent successfully', [
+                'username' => $username,
+                'operation' => $operation,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Push notification failed', [
                 'username' => $username,
                 'error'    => $e->getMessage(),
             ]);

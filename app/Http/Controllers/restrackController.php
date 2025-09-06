@@ -740,7 +740,9 @@ class restrackController extends Controller
         if ($facility && !empty($results_ids)) {
             $notifier->sendNotification(
                 $facility->email,
-                'Hello, you have received results.'
+                'Hello, you have received results.',
+                'ALL', // Both email and push notification
+                'RESULTS_DELIVERY'
             );
         } else {
             Log::warning('Notification not sent: Hub not found or results missing', [
