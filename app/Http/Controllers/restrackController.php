@@ -431,7 +431,8 @@ class restrackController extends Controller
                         
                         // Track delivered packages for notifications
                         $delivered_packages[] = $package;
-                        $delivery_facilities[$request['final_destination']] = $request['final_destination'];
+                        // Use the actual facility ID where delivery is happening, not the package ID
+                        $delivery_facilities[$request['facilityid']] = $request['facilityid'];
                     }
                     if ($request['status']  == 3 && $request['facilityid'] == $package->final_destination) {
                         $update_str .= " , received_at_destination_on = '" . $event->created_at . "', received_by = " . $request['user_id'];
@@ -1645,5 +1646,261 @@ class restrackController extends Controller
         $ret_arr['status'] = 200;
         $ret_arr['status_desc'] = 'Packages fetched successfully';
         return response()->json($ret_arr);
+    }
+
+    public function sendPackageInvitation(Request $request, NotificationService $notifier)
+    {
+        $ret = array();
+        
+        try {
+            $post_data = $request->all();
+            
+            // Validate required fields
+            if (!isset($post_data['package_id']) || !isset($post_data['email']) || !isset($post_data['barcode'])) {
+                $ret['status'] = 400;
+                $ret['status_desc'] = 'Missing required fields: package_id, email, and barcode are required';
+                return response()->json($ret);
+            }
+            
+            // Validate email format
+            if (!filter_var($post_data['email'], FILTER_VALIDATE_EMAIL)) {
+                $ret['status'] = 400;
+                $ret['status_desc'] = 'Invalid email format';
+                return response()->json($ret);
+            }
+            
+            // Prepare invitation data
+            $invitationData = [
+                'package_id' => $post_data['package_id'],
+                'barcode' => $post_data['barcode'],
+                'package_name' => $post_data['package_name'] ?? 'Package',
+                'numbe_of_samples' => $post_data['numbe_of_samples'] ?? '1',
+                'package_type' => $post_data['package_type'] ?? 'Unknown',
+                'facility_name' => $post_data['facility_name'] ?? 'Unknown Facility',
+                'prepared_by' => $post_data['prepared_by'] ?? 'Unknown',
+                'date_prepared' => $post_data['date_prepared'] ?? date('Y-m-d H:i:s'),
+                'email' => $post_data['email']
+            ];
+            
+            // Create invitation record in database
+            $invitation = \DB::table('package_invitations')->insertGetId([
+                'package_id' => $invitationData['package_id'],
+                'barcode' => $invitationData['barcode'],
+                'package_name' => $invitationData['package_name'],
+                'numbe_of_samples' => $invitationData['numbe_of_samples'],
+                'package_type' => $invitationData['package_type'],
+                'facility_name' => $invitationData['facility_name'],
+                'prepared_by' => $invitationData['prepared_by'],
+                'date_prepared' => $invitationData['date_prepared'],
+                'invited_email' => $invitationData['email'],
+                'status' => 'sent',
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+            
+            // Send notification email
+            $subject = 'Package Pickup Invitation - ' . $invitationData['barcode'];
+            $message = $this->buildInvitationMessage($invitationData);
+            
+            $notifier->sendNotification(
+                $invitationData['email'],
+                $message,
+                'EMAIL',
+                'PACKAGE_INVITATION'
+            );
+            
+            $ret['status'] = 200;
+            $ret['status_desc'] = 'Package invitation sent successfully';
+            $ret['invitation_id'] = $invitation;
+            $ret['data'] = $invitationData;
+            
+        } catch (\Exception $e) {
+            \Log::error('Error sending package invitation: ' . $e->getMessage());
+            $ret['status'] = 500;
+            $ret['status_desc'] = 'Failed to send package invitation: ' . $e->getMessage();
+        }
+        
+        return response()->json($ret);
+    }
+    
+    private function buildInvitationMessage($data)
+    {
+        $message = "Hello,\n\n";
+        $message .= "You have been invited to pick up a prepared package with the following details:\n\n";
+        $message .= "Package Barcode: " . $data['barcode'] . "\n";
+        $message .= "Package Name: " . $data['package_name'] . "\n";
+        $message .= "Package Type: " . $data['package_type'] . "\n";
+        $message .= "Number of Samples: " . $data['numbe_of_samples'] . "\n";
+        $message .= "Facility: " . $data['facility_name'] . "\n";
+        $message .= "Prepared By: " . $data['prepared_by'] . "\n";
+        $message .= "Date Prepared: " . $data['date_prepared'] . "\n\n";
+        $message .= "Please use the mobile app to scan the package barcode and pick it up.\n\n";
+        $message .= "Thank you for using the package tracking system.\n\n";
+        $message .= "Best regards,\n";
+        $message .= "Package Tracking System";
+        
+        return $message;
+    }
+
+    /**
+     * Save prepared packages and send notifications
+     */
+    public function savePreparedPackages(Request $request, NotificationService $notifier)
+    {
+        try {
+            $post_data = $request->all();
+            $packages = $post_data['packages'] ?? [];
+            
+            if (empty($packages)) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'No packages provided'
+                ], 400);
+            }
+
+            $savedPackages = [];
+            $samples = [];
+
+            // Save each package to database
+            foreach ($packages as $packageData) {
+                $packageId = \DB::table('package')->insertGetId([
+                    'barcode' => $packageData['barcode'],
+                    'facilityid' => $packageData['facilityid'],
+                    'final_destination' => '888', // Default destination
+                    'created_by' => $packageData['staffId'],
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+
+                // Store package info for notification
+                $savedPackages[] = [
+                    'id' => $packageId,
+                    'barcode' => $packageData['barcode'],
+                    'packageName' => $packageData['packageName'],
+                    'packageType' => $packageData['packageType'],
+                    'facility_name' => $packageData['facility_name']
+                ];
+
+                // Prepare sample data for notification
+                $samples[] = [
+                    'sample_id' => $packageData['barcode'],
+                    'sample_name' => $packageData['packageName']
+                ];
+            }
+
+            // Send notification using the notification service
+            $notificationData = [
+                'username' => '07123456789', // You might want to get this from the request or user context
+                'title' => 'Pick Samples',
+                'message' => 'Hello, you have been invited to pick packages. Please check the app and test the one you can access.',
+                'sendChannel' => 'app',
+                'operation' => 'INVITE_PICK_SAMPLES',
+                'templateData' => [
+                    'from_facility' => $packages[0]['facility_name'] ?? 'Unknown Facility',
+                    'to_facility' => 'Makerere University Lab', // You might want to make this configurable
+                    'samples' => $samples
+                ]
+            ];
+
+            // Call the notification service
+            $notificationResponse = $this->sendNotificationToService($notificationData);
+            
+            \Log::info('Prepared packages saved and notification sent', [
+                'packages_count' => count($savedPackages),
+                'notification_response' => $notificationResponse
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Prepared packages saved successfully and notifications sent',
+                'data' => [
+                    'saved_packages' => $savedPackages,
+                    'notification_response' => $notificationResponse
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error saving prepared packages: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error saving prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Send notification to external service
+     */
+    private function sendNotificationToService($notificationData)
+    {
+        try {
+            $response = \Http::post('https://api.cphl.site/idp/send-notification', $notificationData);
+            
+            \Log::info('Notification service response', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+
+            return [
+                'status' => $response->status(),
+                'body' => $response->json()
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Error sending notification: ' . $e->getMessage());
+            
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get prepared packages for a specific user
+     */
+    public function getPreparedPackages($userId)
+    {
+        try {
+            // Get packages created by the user
+            $packages = \DB::table('package')
+                ->where('created_by', $userId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // Format the response
+            $formattedPackages = $packages->map(function ($package) {
+                return [
+                    'id' => $package->id,
+                    'barcode' => $package->barcode,
+                    'packageName' => 'Prepared Package', // You might want to store this in the package table
+                    'packageType' => 'samples', // You might want to store this in the package table
+                    'numbeOfSamples' => $package->numberofsamples ?? '1',
+                    'facility_name' => 'Unknown Facility', // You might want to join with facilities table
+                    'datePrepared' => $package->created_at,
+                    'status' => 'Prepared',
+                    'created_at' => $package->created_at,
+                ];
+            });
+
+            \Log::info('Fetched prepared packages for user', [
+                'user_id' => $userId,
+                'packages_count' => $formattedPackages->count()
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Prepared packages fetched successfully',
+                'packages' => $formattedPackages
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching prepared packages: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
