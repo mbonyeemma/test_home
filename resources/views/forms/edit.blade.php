@@ -59,9 +59,6 @@
                                 </div>
                             </div>
 
-                            <!-- Icon Picker -->
-                            @include('components.icon-picker', ['selectedIcon' => $form->icon ?? 'file'])
-
                             <div class="form-group">
                                 <label for="form_id">Form ID:</label>
                                 <input type="text" name="form_id" id="form_id" class="form-control"
