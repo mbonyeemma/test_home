@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Forms;
 use Illuminate\Http\Request;
 
+// Include the form icons functions
+require_once app_path('Includes/formIcons.php');
+
 class FormApiController extends Controller
 {
     // Return all forms with their fields
