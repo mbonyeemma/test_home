@@ -8,9 +8,6 @@ use App\Forms;
 use App\Models\Facility;
 use Illuminate\Http\Request;
 
-// Include the form icons functions
-require_once app_path('Includes/formIcons.php');
-
 class FormController extends Controller
 {
     // Predefined color palette for forms
@@ -49,17 +46,10 @@ class FormController extends Controller
             'formSubmissionUrl' => 'required|url',
             'facility_id' => 'nullable|exists:facility,id',
             'color' => 'nullable|string|max:7',
-            'icon' => 'nullable|string|max:50',
         ]);
 
         // Assign random color if not provided
         $color = $request->color ?: $this->formColors[array_rand($this->formColors)];
-        
-        // Validate and assign icon
-        $icon = $request->icon ?: 'file';
-        if (!isValidFormIcon($icon)) {
-            $icon = 'file'; // Fallback to default icon
-        }
 
         Forms::create([
             'name' => $request->name,
@@ -67,7 +57,6 @@ class FormController extends Controller
             'form_submission_url' => $request->formSubmissionUrl,
             'facility_id' => $request->facility_id,
             'color' => $color,
-            'icon' => $icon,
         ]);
 
         return redirect()->route('forms.create')->with('success', 'Form created successfully.');
@@ -257,21 +246,13 @@ class FormController extends Controller
             'formSubmissionUrl' => 'required|url',
             'facility_id' => 'nullable|exists:facility,id',
             'color' => 'nullable|string|max:7',
-            'icon' => 'nullable|string|max:50',
         ]);
-
-        // Validate and assign icon
-        $icon = $request->icon ?: $form->icon;
-        if (!isValidFormIcon($icon)) {
-            $icon = 'file'; // Fallback to default icon
-        }
 
         $form->update([
             'name' => $request->name,
             'form_submission_url' => $request->formSubmissionUrl,
             'facility_id' => $request->facility_id,
             'color' => $request->color ?: $form->color,
-            'icon' => $icon,
         ]);
 
         return redirect()->route('forms.create')->with('success', 'Form updated successfully.');

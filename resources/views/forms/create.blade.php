@@ -66,9 +66,6 @@
                                 </div>
                             </div>
 
-                            <!-- Icon Picker -->
-                            @include('components.icon-picker', ['selectedIcon' => $form->icon ?? 'file'])
-
                             <div class="form-group">
                                 <label for="form_id">Form ID:</label>
                                 <input type="text" name="form_id" id="form_id" class="form-control"
@@ -101,15 +98,8 @@
                                     <div class="col-md-6 col-sm-6">
                                         <div class="form-card" style="border-left: 4px solid {{ $form->color ?? '#3498db' }};">
                                             <div class="form-card-header" style="background-color: {{ $form->color ?? '#3498db' }}; color: white;">
-                                                <div class="form-header-content">
-                                                    <div class="form-icon">
-                                                        <i class="fa fa-{{ $form->icon ?? 'file' }} fa-2x"></i>
-                                                    </div>
-                                                    <div class="form-details">
-                                                        <h4>{{ $form->name }}</h4>
-                                                        <small>{{ $form->facility->name ?? 'N/A' }}</small>
-                                                    </div>
-                                                </div>
+                                                <h4>{{ $form->name }}</h4>
+                                                <small>{{ $form->facility->name ?? 'N/A' }}</small>
                                             </div>
                                             <div class="form-card-body">
                                                 <p><strong>Form ID:</strong> {{ $form->form_id }}</p>
@@ -214,20 +204,6 @@
         .form-card-header {
             padding: 15px;
             border-bottom: 1px solid #eee;
-        }
-        
-        .form-header-content {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .form-icon {
-            flex-shrink: 0;
-        }
-        
-        .form-details {
-            flex: 1;
         }
         
         .form-card-header h4 {
