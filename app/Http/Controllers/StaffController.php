@@ -154,8 +154,18 @@ class StaffController extends Controller
             return redirect()->back()->with('info', "Approval recorded. Waiting for {$requiredApprovals} total approvals.");
         }
 
+        // Check if user already exists in users table before creating
+        $existingUser = \App\Models\User::where('username', $selfReg->username)
+            ->orWhere('email', $selfReg->email)
+            ->first();
+            
+        if ($existingUser) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'User already exists in system. Cannot approve duplicate registration.');
+        }
+        
         // Enough approvals → create user
-        $user = new User();
+        $user = new \App\Models\User();
         $user->name = $selfReg->name;
         $user->email = $selfReg->email;
         $user->password = $selfReg->password;
@@ -175,22 +185,15 @@ class StaffController extends Controller
         // Update self_reg as active
         DB::update("UPDATE restrackself_reg SET isactive = 1 WHERE id = ?", [$id]);
 
-        // Send notification
+        // Send notification using NotificationService
         try {
-            $client = new Client();
-            $client->post('https://api.cphl.site/idp/send-notification', [
-                'headers' => [
-                    'Authorization' => 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im1ib255ZWVtbWFAeW1haWwuY29tIiwiYXV0aCI6ImNwaGwiLCJkYXRlIjoiMjAyNS0wNC0wN1QwODo0Mjo0Ny43MzRaIiwiaWF0IjoxNzQ0MDE1MzY3fQ.mMh61xjsVC_ybPQo1bpZtcegvU0Rzk8L1iBMI--bZ54',
-                    'Accept'        => 'application/json',
-                    'Content-Type'  => 'application/json',
-                ],
-                'json' => [
-                    'username'    => $selfReg->username,
-                    'message'     => 'Hello, your account has been approved.',
-                    'sendChannel' => 'EMAIL',
-                    'operation'   => 'ACCOUNT_APPROVAL',
-                ],
-            ]);
+            $notifier = new \App\Services\NotificationService();
+            $notifier->sendNotification(
+                $selfReg->username,
+                'Hello, your account has been approved.',
+                'EMAIL', // Email notification only
+                'ACCOUNT_APPROVAL'
+            );
         } catch (\Exception $notifyEx) {
             \Log::error('User approved but notification failed', [
                 'user_id' => $user->id,

@@ -57,7 +57,8 @@ class UserController extends Controller {
         $this->validate($request, [
             'name'=>'required|max:120',
             'email'=>'required|email|unique:users',
-            'password'=>'required|min:6|confirmed'
+            'password'=>'required|min:6|confirmed',
+            'roles' => 'required|array|min:1' // Allow unlimited roles
         ]);
 		try {
 				$user = new User;
@@ -70,11 +71,14 @@ class UserController extends Controller {
 				$user->username = $request->username;
 				$user->save();
 				//$user = User::create($request->only('email', 'name', 'password','hubid','healthregionid','username')); 
+				
+				// Attach all selected roles
 				$user->roles()->attach($request['roles']);
+				
 				 return redirect()->route('users.show', array('id' => $user->id))->with('flash_message',
 				 'User successfully added.');
 			}catch (\Exception $e) {
-				print_r($e);
+				print_r('faild to save'.$e);
 				exit;
 			}
     }
@@ -142,12 +146,12 @@ class UserController extends Controller {
     }
 
     /**
-    * Update the specified resource in storage.
-    *
-    * @param  \Illuminate\Http\Request  $request
-    * @param  int  $id
-    * @return \Illuminate\Http\Response
-    */
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
     public function update(Request $request, $id) {
         $user = User::findOrFail($id); //Get role specified by id
 
@@ -155,7 +159,8 @@ class UserController extends Controller {
         $this->validate($request, [
             'name'=>'required|max:120',
             'email'=>'required|email|unique:users,email,'.$id,
-            'password'=>'required|min:6|confirmed'
+            'password'=>'required|min:6|confirmed',
+            'roles' => 'required|array|min:1' // Allow unlimited roles
         ]);
        // $input = $request->only(['name', 'email', 'password']); 
         $roles = $request['roles']; //Retreive all roles
@@ -180,6 +185,7 @@ class UserController extends Controller {
 		$user->save();
 
         if (isset($roles)) {        
+            // Sync all selected roles
             $user->roles()->sync($roles);  //If one or more role is selected associate user to roles          
         }        
         else {

@@ -10,14 +10,31 @@ use Illuminate\Http\Request;
 
 class FormController extends Controller
 {
+    // Predefined color palette for forms
+    private $formColors = [
+        '#3498db', // Blue
+        '#e74c3c', // Red
+        '#2ecc71', // Green
+        '#f39c12', // Orange
+        '#9b59b6', // Purple
+        '#1abc9c', // Turquoise
+        '#e67e22', // Carrot
+        '#34495e', // Dark Blue
+        '#16a085', // Dark Turquoise
+        '#8e44ad', // Dark Purple
+        '#27ae60', // Dark Green
+        '#c0392b', // Dark Red
+    ];
+
     // Show form creation page with listing
     public function create()
     {
         $formId = 'FORM-' . strtoupper(uniqid());
         $forms = Forms::with('facility')->latest()->get();
         $facilities = Facility::orderBy('id')->pluck('name', 'id');
+        $colors = $this->formColors;
        
-        return view('forms.create', compact('formId', 'forms','facilities'))->with('formMode', 'create');
+        return view('forms.create', compact('formId', 'forms','facilities', 'colors'))->with('formMode', 'create');
     }
 
     // Store new form
@@ -28,13 +45,18 @@ class FormController extends Controller
             'form_id' => 'required|string|max:255|unique:forms,form_id',
             'formSubmissionUrl' => 'required|url',
             'facility_id' => 'nullable|exists:facility,id',
+            'color' => 'nullable|string|max:7',
         ]);
+
+        // Assign random color if not provided
+        $color = $request->color ?: $this->formColors[array_rand($this->formColors)];
 
         Forms::create([
             'name' => $request->name,
             'form_id' => $request->form_id,
             'form_submission_url' => $request->formSubmissionUrl,
             'facility_id' => $request->facility_id,
+            'color' => $color,
         ]);
 
         return redirect()->route('forms.create')->with('success', 'Form created successfully.');
@@ -105,209 +127,148 @@ class FormController extends Controller
                     : null,
             ];
 
-            if ($form->publish_status === 'approved') {
-                // Require maker-checker
-                $data['maker_id'] = auth()->id();
-                $data['approval_status'] = 'pending';
-                //Field Change
-                 FieldChange::create([
-                'form_field_id' => null,
+            // Create field change request for approval
+            FieldChange::create([
+                'form_field_id' => null, // Will be set after approval
                 'form_id' => $form->id,
                 'maker_id' => auth()->id(),
                 'action' => 'create',
                 'field_data' => $data,
+                'approval_status' => 'pending',
             ]);
-                $message = 'pre_success';
-            } else {
-                // Draft: auto-approve
-                $data['approval_status'] = 'approved';
-                $data['maker_id'] = auth()->id();
-                $data['checker_id'] = auth()->id();
-                $data['checked_at'] = now();
-                $form->fields()->create($data);
-                $message = 'post_success';
-            }
-
         }
 
         return redirect()->route('forms.fields.create', $form->form_id)
-                        ->with($message, 'Fields submitted successfully.');
+                         ->with('success', 'Field changes submitted for approval.');
     }
 
     public function approveField($id)
     {
-        $change = FieldChange::findOrFail($id);
-
-        if ($change->maker_id === auth()->id()) {
-            return back()->with('error', 'You cannot approve your own change.');
+        $fieldChange = FieldChange::findOrFail($id);
+        
+        if ($fieldChange->approval_status !== 'pending') {
+            return redirect()->back()->with('error', 'Field change already processed.');
         }
 
-        if ($change->approval_status !== 'pending') {
-            return back()->with('error', 'Already reviewed.');
-        }
-
-        $fieldData = $change->field_data;
-
-        switch ($change->action) {
-            case 'create':
-                $field = FormFields::create(array_merge($fieldData, [
-                    'form_id' => $change->form_id,
-                    'maker_id' => $change->maker_id,
-                    'checker_id' => auth()->id(),
-                    'approval_status' => 'approved',
-                    'checked_at' => now(),
-                ]));
-                $change->form_field_id = $field->id;
-                break;
-
-            case 'update':
-                $change->field->update(array_merge($fieldData, [
-                    'checker_id' => auth()->id(),
-                    'approval_status' => 'approved',
-                    'checked_at' => now(),
-                ]));
-                break;
-
-            case 'delete':
-                $change->field->delete();
-                break;
-        }
-
-        $change->update([
+        $fieldChange->update([
             'approval_status' => 'approved',
             'checker_id' => auth()->id(),
             'checked_at' => now(),
         ]);
 
-        return back()->with('success', 'Change approved.');
+        // Create the actual field
+        $form = Forms::findOrFail($fieldChange->form_id);
+        $field = $form->fields()->create($fieldChange->field_data);
+        
+        // Update the field_change with the created field ID
+        $fieldChange->update(['form_field_id' => $field->id]);
+
+        return redirect()->back()->with('success', 'Field approved and created successfully.');
     }
 
     public function rejectField($id)
     {
-        $change = FieldChange::findOrFail($id);
-
-        if ($change->maker_id === auth()->id()) {
-            return back()->with('error', 'You cannot reject your own change.');
+        $fieldChange = FieldChange::findOrFail($id);
+        
+        if ($fieldChange->approval_status !== 'pending') {
+            return redirect()->back()->with('error', 'Field change already processed.');
         }
 
-        $change->update([
+        $fieldChange->update([
             'approval_status' => 'rejected',
             'checker_id' => auth()->id(),
             'checked_at' => now(),
         ]);
 
-        return back()->with('success', 'Change rejected.');
+        return redirect()->back()->with('success', 'Field change rejected.');
     }
 
-
-   public function submitForApproval($form_id)
+    public function submitForApproval($form_id)
     {
         $form = Forms::where('form_id', $form_id)->firstOrFail();
-
-        if ($form->publish_status !== 'draft') {
-            return redirect()->route('forms.create')->with('error_sa', 'Only draft forms can be submitted.');
-        }
-
+        
         $form->update([
-            'publish_status' => 'pending_approval',
+            'publish_status' => 'pending',
             'submitted_by' => auth()->id(),
         ]);
 
-        return redirect()->route('forms.create')->with('success_sa', 'Form submitted for approval.');
+        return redirect()->back()->with('success', 'Form submitted for approval.');
     }
 
     public function approve($form_id)
     {
         $form = Forms::where('form_id', $form_id)->firstOrFail();
-
-        if ($form->publish_status !== 'pending_approval') {
-            return redirect()->route('forms.create')->with('error_sa', 'Only pending forms can be approved.');
-        }
-
-        if ($form->submitted_by === auth()->id()) {
-            return redirect()->route('forms.create')->with('error_sa', 'The maker cannot approve their own form.');
+        
+        if ($form->publish_status !== 'pending') {
+            return redirect()->back()->with('error', 'Form is not pending approval.');
         }
 
         $form->update([
-            'publish_status' => 'approved',
+            'publish_status' => 'published',
             'approved_by' => auth()->id(),
         ]);
 
-        return redirect()->route('forms.create')->with('success_sa', 'Form approved successfully.');
+        return redirect()->back()->with('success', 'Form approved and published.');
     }
 
-
-    // List all forms
     public function index()
     {
-        $forms = Forms::with('fields')->latest()->get();
-
-        return view('forms.index', [
-            'formMode' => 'create',
-            'forms' => $forms,
-        ]);
+        $forms = Forms::with('facility')->latest()->get();
+        return view('forms.index', compact('forms'));
     }
 
-    // Show a single form with fields
     public function show($form_id)
     {
-        $form = Forms::with('fields')->where('form_id', $form_id)->firstOrFail();
+        $form = Forms::where('form_id', $form_id)->with('fields')->firstOrFail();
         return view('forms.show', compact('form'));
     }
 
-    // Provide form JSON API
     public function api($form_id)
     {
-        $form = Forms::with('fields')->where('form_id', $form_id)->firstOrFail();
+        $form = Forms::where('form_id', $form_id)->with('fields')->firstOrFail();
         return response()->json($form);
     }
 
-    // Edit form and load into view
     public function edit($form_id)
-{
-    $form = Forms::where('form_id', $form_id)->firstOrFail();
-    $forms = Forms::latest()->get();
-    $formId = $form->form_id; // keep for consistency
-    $facilities = Facility::orderBy('id')->pluck('name', 'id');
+    {
+        $form = Forms::where('form_id', $form_id)->firstOrFail();
+        $facilities = Facility::orderBy('id')->pluck('name', 'id');
+        $colors = $this->formColors;
+        return view('forms.edit', compact('form', 'facilities', 'colors'));
+    }
 
-    return view('forms.create', [ // or 'forms.index' depending on your structure
-        'form' => $form,
-        'formId' => $formId,
-        'forms' => $forms,
-        'formMode' => 'edit',
-        'facilities' => $facilities
-    ]);
-}
+    public function update(Request $request, $form_id)
+    {
+        $form = Forms::where('form_id', $form_id)->firstOrFail();
+        
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'formSubmissionUrl' => 'required|url',
+            'facility_id' => 'nullable|exists:facility,id',
+            'color' => 'nullable|string|max:7',
+        ]);
 
-   public function update(Request $request, $form_id)
-{
-    $form = Forms::where('form_id', $form_id)->firstOrFail();
+        $form->update([
+            'name' => $request->name,
+            'form_submission_url' => $request->formSubmissionUrl,
+            'facility_id' => $request->facility_id,
+            'color' => $request->color ?: $form->color,
+        ]);
 
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'formSubmissionUrl' => 'required|url',
-        'facility_id' => 'nullable|exists:facility,id',
-        // Remove 'fields' validation if you're not updating them here
-    ]);
+        return redirect()->route('forms.create')->with('success', 'Form updated successfully.');
+    }
 
-    $form->update([
-        'name' => $request->name,
-        'form_submission_url' => $request->formSubmissionUrl,
-        'facility_id' => $request->facility_id,
-    ]);
-
-    return redirect()->route('forms.create')->with('success', 'Form updated successfully.');
-}
-
-
-    // Delete a form and its fields
     public function destroy($form_id)
     {
         $form = Forms::where('form_id', $form_id)->firstOrFail();
-
-        $form->fields()->delete();
         $form->delete();
 
         return redirect()->route('forms.create')->with('success', 'Form deleted successfully.');
+    }
+
+    // Get available colors for forms
+    public function getColors()
+    {
+        return response()->json($this->formColors);
     }
 }

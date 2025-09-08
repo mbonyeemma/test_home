@@ -143,15 +143,17 @@
         {{ Form::email('email', null, array('class' => 'form-control')) }}
     </div>
 
-    <h5><b>Give Role</b></h5>
+    <h5><b>Assign Roles</b></h5>
+    <p class="text-muted">Select one or more roles for this user. You can assign as many roles as needed.</p>
 
     <div class='form-group'>
         @foreach ($roles as $role)
-            {{ Form::checkbox('roles[]',  $role->id, $user->roles, ['id' => 'role'.$role->id] ) }}
-            {{ Form::label($role->name, ucfirst($role->name)) }}<br>
-
+            {{ Form::checkbox('roles[]',  $role->id, $user->roles, ['id' => 'role'.$role->id, 'class' => 'role-checkbox'] ) }}
+            {{ Form::label('role'.$role->id, ucfirst($role->display_name ?: $role->name)) }}<br>
         @endforeach
     </div>
+    
+    <!-- Role selection is now unlimited -->
 	<div class="form-group hidden" id="hub">
         {{ Form::label('hubid', 'Hub') }}
         {{ Form::select('hubid', $hubs, null, ['class' => 'form-control']) }}

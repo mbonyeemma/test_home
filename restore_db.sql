@@ -1,0 +1,3 @@
+SET FOREIGN_KEY_CHECKS=0;
+source /tmp/hub_db.sql;
+SET FOREIGN_KEY_CHECKS=1;
