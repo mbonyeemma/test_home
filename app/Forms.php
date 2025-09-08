@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Forms extends Model
 {
-    protected $fillable = ['name', 'form_id', 'facility_id', 'form_submission_url', 'publish_status', 'submitted_by', 'approved_by', 'color', 'icon'];
+    protected $fillable = ['name', 'form_id', 'facility_id', 'form_submission_url', 'publish_status', 'submitted_by', 'approved_by', 'color'];
     
     public function fields()
     {

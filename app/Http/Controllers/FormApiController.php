@@ -12,15 +12,6 @@ class FormApiController extends Controller
     public function index()
     {
         $forms = Forms::with('fields')->get();
-        
-        // Add default icons to forms that don't have icons
-        $forms->each(function ($form) {
-            if (empty($form->icon)) {
-                $form->icon = getRandomFormIcon();
-                $form->save(); // Save the new icon to database
-            }
-        });
-        
         return response()->json([
             'status' => 'success',
             'data' => $forms
@@ -51,14 +42,6 @@ class FormApiController extends Controller
         $forms = Forms::with('fields')
                       ->where('publish_status', 'approved')
                       ->get();
-
-        // Add default icons to forms that don't have icons
-        $forms->each(function ($form) {
-            if (empty($form->icon)) {
-                $form->icon = getRandomFormIcon();
-                $form->save(); // Save the new icon to database
-            }
-        });
 
         return response()->json([
             'status' => 'success',
@@ -150,37 +133,11 @@ class FormApiController extends Controller
 
     public function colors()
     {
-        $forms = Forms::select('form_id', 'name', 'color', 'icon', 'publish_status')->get();
+        $forms = Forms::select('form_id', 'name', 'color', 'publish_status')->get();
         
         return response()->json([
             'status' => 'success',
             'data' => $forms
-        ]);
-    }
-
-    /**
-     * Get all available form icons
-     */
-    public function icons()
-    {
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'all_icons' => getFormIcons(),
-                'categories' => [
-                    'medical' => getIconsByCategory('medical'),
-                    'data' => getIconsByCategory('data'),
-                    'document' => getIconsByCategory('document'),
-                    'communication' => getIconsByCategory('communication'),
-                    'security' => getIconsByCategory('security'),
-                    'technology' => getIconsByCategory('technology'),
-                    'business' => getIconsByCategory('business'),
-                    'education' => getIconsByCategory('education'),
-                    'time' => getIconsByCategory('time'),
-                    'location' => getIconsByCategory('location'),
-                    'general' => getIconsByCategory('general')
-                ]
-            ]
         ]);
     }
 }
