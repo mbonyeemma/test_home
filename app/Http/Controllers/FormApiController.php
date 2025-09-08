@@ -8,6 +8,40 @@ use Illuminate\Http\Request;
 
 class FormApiController extends Controller
 {
+    /**
+     * Get a random icon from available icons
+     */
+    private function getRandomFormIcon()
+    {
+        $icons = [
+            'stethoscope', 'heartbeat', 'user-md', 'hospital-o', 'medkit', 'ambulance',
+            'heart', 'plus-square', 'user-plus', 'wheelchair', 'bed', 'thermometer-half',
+            'database', 'bar-chart', 'pie-chart', 'line-chart', 'area-chart', 'table',
+            'calculator', 'percent', 'trending-up', 'trending-down', 'signal',
+            'file-text-o', 'clipboard', 'list-alt', 'check-square-o', 'file-o', 'file-pdf-o',
+            'file-word-o', 'file-excel-o', 'edit', 'pencil', 'pencil-square-o',
+            'envelope', 'envelope-o', 'phone', 'mobile', 'comment', 'comments', 'bullhorn',
+            'megaphone', 'volume-up', 'volume-down', 'microphone',
+            'lock', 'unlock', 'key', 'shield', 'user-secret', 'eye', 'eye-slash',
+            'fingerprint', 'id-card', 'id-card-o', 'vcard', 'vcard-o',
+            'laptop', 'desktop', 'tablet', 'mobile', 'wifi', 'bluetooth', 'usb',
+            'plug', 'power-off', 'cog', 'cogs', 'wrench', 'screwdriver',
+            'briefcase', 'building', 'building-o', 'bank', 'money', 'dollar', 'credit-card',
+            'shopping-cart', 'shopping-bag', 'truck', 'shipping-fast',
+            'graduation-cap', 'book', 'bookmark', 'bookmark-o', 'lightbulb-o', 'mortar-board',
+            'pencil-square', 'eraser', 'magic', 'star', 'star-o',
+            'clock-o', 'calendar', 'calendar-o', 'calendar-check-o', 'calendar-times-o',
+            'hourglass-start', 'hourglass-half', 'hourglass-end', 'history',
+            'map-marker', 'map', 'globe', 'compass', 'road', 'car', 'plane', 'ship',
+            'bicycle', 'motorcycle', 'walking', 'running',
+            'home', 'search', 'filter', 'sort', 'refresh', 'undo', 'redo', 'save',
+            'download', 'upload', 'share', 'link', 'external-link', 'expand', 'compress',
+            'plus', 'minus', 'times', 'check', 'question', 'exclamation', 'info',
+            'warning', 'ban', 'trash', 'recycle', 'leaf', 'tree', 'sun-o', 'moon-o'
+        ];
+        return $icons[array_rand($icons)];
+    }
+
     // Return all forms with their fields
     public function index()
     {
@@ -16,7 +50,8 @@ class FormApiController extends Controller
         // Add default icons to forms that don't have icons
         $forms->each(function ($form) {
             if (empty($form->icon)) {
-                $form->icon = getRandomFormIcon();
+                // Use random icon
+                $form->icon = $this->getRandomFormIcon();
                 $form->save(); // Save the new icon to database
             }
         });
@@ -55,7 +90,8 @@ class FormApiController extends Controller
         // Add default icons to forms that don't have icons
         $forms->each(function ($form) {
             if (empty($form->icon)) {
-                $form->icon = getRandomFormIcon();
+                // Use random icon
+                $form->icon = $this->getRandomFormIcon();
                 $form->save(); // Save the new icon to database
             }
         });
@@ -163,22 +199,49 @@ class FormApiController extends Controller
      */
     public function icons()
     {
+        $allIcons = [
+            'stethoscope', 'heartbeat', 'user-md', 'hospital-o', 'medkit', 'ambulance',
+            'heart', 'plus-square', 'user-plus', 'wheelchair', 'bed', 'thermometer-half',
+            'database', 'bar-chart', 'pie-chart', 'line-chart', 'area-chart', 'table',
+            'calculator', 'percent', 'trending-up', 'trending-down', 'signal',
+            'file-text-o', 'clipboard', 'list-alt', 'check-square-o', 'file-o', 'file-pdf-o',
+            'file-word-o', 'file-excel-o', 'edit', 'pencil', 'pencil-square-o',
+            'envelope', 'envelope-o', 'phone', 'mobile', 'comment', 'comments', 'bullhorn',
+            'megaphone', 'volume-up', 'volume-down', 'microphone',
+            'lock', 'unlock', 'key', 'shield', 'user-secret', 'eye', 'eye-slash',
+            'fingerprint', 'id-card', 'id-card-o', 'vcard', 'vcard-o',
+            'laptop', 'desktop', 'tablet', 'mobile', 'wifi', 'bluetooth', 'usb',
+            'plug', 'power-off', 'cog', 'cogs', 'wrench', 'screwdriver',
+            'briefcase', 'building', 'building-o', 'bank', 'money', 'dollar', 'credit-card',
+            'shopping-cart', 'shopping-bag', 'truck', 'shipping-fast',
+            'graduation-cap', 'book', 'bookmark', 'bookmark-o', 'lightbulb-o', 'mortar-board',
+            'pencil-square', 'eraser', 'magic', 'star', 'star-o',
+            'clock-o', 'calendar', 'calendar-o', 'calendar-check-o', 'calendar-times-o',
+            'hourglass-start', 'hourglass-half', 'hourglass-end', 'history',
+            'map-marker', 'map', 'globe', 'compass', 'road', 'car', 'plane', 'ship',
+            'bicycle', 'motorcycle', 'walking', 'running',
+            'home', 'search', 'filter', 'sort', 'refresh', 'undo', 'redo', 'save',
+            'download', 'upload', 'share', 'link', 'external-link', 'expand', 'compress',
+            'plus', 'minus', 'times', 'check', 'question', 'exclamation', 'info',
+            'warning', 'ban', 'trash', 'recycle', 'leaf', 'tree', 'sun-o', 'moon-o'
+        ];
+
         return response()->json([
             'status' => 'success',
             'data' => [
-                'all_icons' => getFormIcons(),
+                'all_icons' => $allIcons,
                 'categories' => [
-                    'medical' => getIconsByCategory('medical'),
-                    'data' => getIconsByCategory('data'),
-                    'document' => getIconsByCategory('document'),
-                    'communication' => getIconsByCategory('communication'),
-                    'security' => getIconsByCategory('security'),
-                    'technology' => getIconsByCategory('technology'),
-                    'business' => getIconsByCategory('business'),
-                    'education' => getIconsByCategory('education'),
-                    'time' => getIconsByCategory('time'),
-                    'location' => getIconsByCategory('location'),
-                    'general' => getIconsByCategory('general')
+                    'medical' => ['stethoscope', 'heartbeat', 'user-md', 'hospital-o', 'medkit', 'ambulance', 'heart', 'plus-square', 'user-plus', 'wheelchair', 'bed', 'thermometer-half'],
+                    'data' => ['database', 'bar-chart', 'pie-chart', 'line-chart', 'area-chart', 'table', 'calculator', 'percent', 'trending-up', 'trending-down', 'signal'],
+                    'document' => ['file-text-o', 'clipboard', 'list-alt', 'check-square-o', 'file-o', 'file-pdf-o', 'file-word-o', 'file-excel-o', 'edit', 'pencil', 'pencil-square-o'],
+                    'communication' => ['envelope', 'envelope-o', 'phone', 'mobile', 'comment', 'comments', 'bullhorn', 'megaphone', 'volume-up', 'volume-down', 'microphone'],
+                    'security' => ['lock', 'unlock', 'key', 'shield', 'user-secret', 'eye', 'eye-slash', 'fingerprint', 'id-card', 'id-card-o', 'vcard', 'vcard-o'],
+                    'technology' => ['laptop', 'desktop', 'tablet', 'mobile', 'wifi', 'bluetooth', 'usb', 'plug', 'power-off', 'cog', 'cogs', 'wrench', 'screwdriver'],
+                    'business' => ['briefcase', 'building', 'building-o', 'bank', 'money', 'dollar', 'credit-card', 'shopping-cart', 'shopping-bag', 'truck', 'shipping-fast'],
+                    'education' => ['graduation-cap', 'book', 'bookmark', 'bookmark-o', 'lightbulb-o', 'mortar-board', 'pencil-square', 'eraser', 'magic', 'star', 'star-o'],
+                    'time' => ['clock-o', 'calendar', 'calendar-o', 'calendar-check-o', 'calendar-times-o', 'hourglass-start', 'hourglass-half', 'hourglass-end', 'history'],
+                    'location' => ['map-marker', 'map', 'globe', 'compass', 'road', 'car', 'plane', 'ship', 'bicycle', 'motorcycle', 'walking', 'running'],
+                    'general' => ['home', 'search', 'filter', 'sort', 'refresh', 'undo', 'redo', 'save', 'download', 'upload', 'share', 'link', 'external-link', 'expand', 'compress', 'plus', 'minus', 'times', 'check', 'question', 'exclamation', 'info', 'warning', 'ban', 'trash', 'recycle', 'leaf', 'tree', 'sun-o', 'moon-o']
                 ]
             ]
         ]);
