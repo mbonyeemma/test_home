@@ -694,13 +694,26 @@ class restrackController extends Controller
             // INNER JOIN facility sf ON(p.facilityid = sf.id)
             // INNER JOIN facility fd ON(p.final_destination = fd.id)
             // WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
-            $query = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples from packagemovement_events pme
+            
+            // Get packages with movement events (existing delivery packages)
+            $query1 = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'delivery' as package_type from packagemovement_events pme
                 INNER JOIN package p ON p.latest_event_id = pme.id
                 INNER JOIN facility ef ON(pme.location = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
                 WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
+            
+            // Get prepared packages (newly prepared packages waiting for pickup)
+            $query2 = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, sf.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'prepared' as package_type from package p
+                INNER JOIN facility sf ON(p.facilityid = sf.id)
+                LEFT JOIN facility fd ON(p.final_destination = fd.id)
+                LEFT JOIN testtypes tt ON (p.test_type = tt.id)
+                WHERE p.created_by = " . $cat_id . " AND p.status = 0 AND p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                AND NOT EXISTS (SELECT 1 FROM packagemovement_events pme WHERE pme.package_id = p.id)";
+            
+            // Combine both queries with UNION
+            $query = "(" . $query1 . ") UNION (" . $query2 . ") ORDER BY created_at DESC";
         } else {
             $query = "SELECT p.barcode,sf.name as source_facility,fd.name as final_destination, ef.name as last_location FROM `package` p 
             INNER JOIN packagemovement_events pme ON (p.latest_event_id = pme.id)
@@ -2033,77 +2046,4 @@ class restrackController extends Controller
         }
     }
 
-    /**
-     * Get packages available for delivery (including prepared packages)
-     */
-    public function getPackagesForDelivery($userId)
-    {
-        try {
-            // Get packages that are available for delivery
-            // This includes packages with status 0 (waiting for pickup) and packages assigned to the user
-            $packages = \DB::table('package')
-                ->leftJoin('facility as source_facility', 'package.facilityid', '=', 'source_facility.id')
-                ->leftJoin('facility as dest_facility', 'package.final_destination', '=', 'dest_facility.id')
-                ->leftJoin('packagemovement_events', 'package.latest_event_id', '=', 'packagemovement_events.id')
-                ->where(function($query) use ($userId) {
-                    $query->where('package.status', 0) // Waiting for pickup
-                          ->orWhere('packagemovement_events.created_by', $userId); // Assigned to user
-                })
-                ->where('package.status', '<', 3) // Not yet received
-                ->select(
-                    'package.id',
-                    'package.barcode',
-                    'package.numberofsamples',
-                    'package.created_at',
-                    'package.status',
-                    'package.final_destination',
-                    'source_facility.name as source_facility',
-                    'dest_facility.name as final_destination',
-                    'packagemovement_events.status as event_status',
-                    'packagemovement_events.place_name as last_location'
-                )
-                ->orderBy('package.created_at', 'desc')
-                ->get();
-
-            // Format the response to match the expected format
-            $formattedPackages = $packages->map(function ($package) {
-                $status = 'Waiting for Pickup';
-                if ($package->status == 1) {
-                    $status = 'In Transit';
-                } elseif ($package->status == 2) {
-                    $status = 'Delivered';
-                }
-
-                return [
-                    'barcode' => $package->barcode,
-                    'source_facility' => $package->source_facility ?? 'Unknown Facility',
-                    'final_destination' => $package->final_destination ?? 'Unknown Destination',
-                    'test_name' => 'Prepared Package',
-                    'numberofsamples' => $package->numberofsamples ?? 1,
-                    'created_at' => $package->created_at,
-                    'status' => $status,
-                    'last_location' => $package->last_location ?? 'Unknown Location'
-                ];
-            });
-
-            \Log::info('Fetched packages for delivery', [
-                'user_id' => $userId,
-                'packages_count' => $formattedPackages->count()
-            ]);
-
-            return response()->json([
-                'status' => 200,
-                'message' => 'Packages for delivery fetched successfully',
-                'samples' => $formattedPackages
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Error fetching packages for delivery: ' . $e->getMessage());
-            
-            return response()->json([
-                'status' => 500,
-                'message' => 'Error fetching packages for delivery: ' . $e->getMessage()
-            ], 500);
-        }
-    }
 }
