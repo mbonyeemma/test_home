@@ -1814,8 +1814,28 @@ class restrackController extends Controller
                         'numberofsamples' => $packageData['numbeOfSamples'] ?? $packageData['numberOfSamples'] ?? 1,
                         'is_tracked_from_facility' => 1,
                         'is_batch' => 0,
+                        'status' => 0, // Set status to 0 (waiting for pickup)
                         'created_at' => now(),
                         'updated_at' => now()
+                    ]);
+
+                    // Create a PackageMovementEvent to make the package available for delivery
+                    $eventId = \DB::table('packagemovement_events')->insertGetId([
+                        'package_id' => $packageId,
+                        'source' => $facilityid,
+                        'destination' => $packageData['final_destination'] ?? '888',
+                        'status' => 0, // Status 0 = waiting for pickup
+                        'location' => $facilityid,
+                        'place_name' => $packageData['facility_name'] ?? 'Unknown Facility',
+                        'category_id' => $packageData['test_type'] ?? 1,
+                        'created_by' => $packageData['staffId'] ?? 1,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                    // Update the package with the latest event ID
+                    \DB::table('package')->where('id', $packageId)->update([
+                        'latest_event_id' => $eventId
                     ]);
 
                     // Store package info for notification
@@ -1961,10 +1981,20 @@ class restrackController extends Controller
     public function getPreparedPackages($userId)
     {
         try {
-            // Get packages created by the user
+            // Get packages created by the user with facility information
             $packages = \DB::table('package')
-                ->where('created_by', $userId)
-                ->orderBy('created_at', 'desc')
+                ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                ->where('package.created_by', $userId)
+                ->select(
+                    'package.id',
+                    'package.barcode',
+                    'package.numberofsamples',
+                    'package.created_at',
+                    'package.status',
+                    'package.final_destination',
+                    'facility.name as facility_name'
+                )
+                ->orderBy('package.created_at', 'desc')
                 ->get();
 
             // Format the response
@@ -1972,12 +2002,12 @@ class restrackController extends Controller
                 return [
                     'id' => $package->id,
                     'barcode' => $package->barcode,
-                    'packageName' => 'Prepared Package', // You might want to store this in the package table
-                    'packageType' => 'samples', // You might want to store this in the package table
-                    'numbeOfSamples' => $package->numberofsamples ?? '1',
-                    'facility_name' => 'Unknown Facility', // You might want to join with facilities table
+                    'packageName' => 'Prepared Package',
+                    'packageType' => 'samples',
+                    'numberOfSamples' => $package->numberofsamples ?? 1,
+                    'facility_name' => $package->facility_name ?? 'Unknown Facility',
                     'datePrepared' => $package->created_at,
-                    'status' => 'Prepared',
+                    'status' => $package->status == 0 ? 'Waiting for Pickup' : 'Prepared',
                     'created_at' => $package->created_at,
                 ];
             });
@@ -1999,6 +2029,80 @@ class restrackController extends Controller
             return response()->json([
                 'status' => 500,
                 'message' => 'Error fetching prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get packages available for delivery (including prepared packages)
+     */
+    public function getPackagesForDelivery($userId)
+    {
+        try {
+            // Get packages that are available for delivery
+            // This includes packages with status 0 (waiting for pickup) and packages assigned to the user
+            $packages = \DB::table('package')
+                ->leftJoin('facility as source_facility', 'package.facilityid', '=', 'source_facility.id')
+                ->leftJoin('facility as dest_facility', 'package.final_destination', '=', 'dest_facility.id')
+                ->leftJoin('packagemovement_events', 'package.latest_event_id', '=', 'packagemovement_events.id')
+                ->where(function($query) use ($userId) {
+                    $query->where('package.status', 0) // Waiting for pickup
+                          ->orWhere('packagemovement_events.created_by', $userId); // Assigned to user
+                })
+                ->where('package.status', '<', 3) // Not yet received
+                ->select(
+                    'package.id',
+                    'package.barcode',
+                    'package.numberofsamples',
+                    'package.created_at',
+                    'package.status',
+                    'package.final_destination',
+                    'source_facility.name as source_facility',
+                    'dest_facility.name as final_destination',
+                    'packagemovement_events.status as event_status',
+                    'packagemovement_events.place_name as last_location'
+                )
+                ->orderBy('package.created_at', 'desc')
+                ->get();
+
+            // Format the response to match the expected format
+            $formattedPackages = $packages->map(function ($package) {
+                $status = 'Waiting for Pickup';
+                if ($package->status == 1) {
+                    $status = 'In Transit';
+                } elseif ($package->status == 2) {
+                    $status = 'Delivered';
+                }
+
+                return [
+                    'barcode' => $package->barcode,
+                    'source_facility' => $package->source_facility ?? 'Unknown Facility',
+                    'final_destination' => $package->final_destination ?? 'Unknown Destination',
+                    'test_name' => 'Prepared Package',
+                    'numberofsamples' => $package->numberofsamples ?? 1,
+                    'created_at' => $package->created_at,
+                    'status' => $status,
+                    'last_location' => $package->last_location ?? 'Unknown Location'
+                ];
+            });
+
+            \Log::info('Fetched packages for delivery', [
+                'user_id' => $userId,
+                'packages_count' => $formattedPackages->count()
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Packages for delivery fetched successfully',
+                'samples' => $formattedPackages
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching packages for delivery: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching packages for delivery: ' . $e->getMessage()
             ], 500);
         }
     }
