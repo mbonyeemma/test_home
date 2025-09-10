@@ -696,7 +696,7 @@ class restrackController extends Controller
             // WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
             
             // Get packages with movement events (existing delivery packages)
-            $query1 = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'delivery' as package_type from packagemovement_events pme
+            $query1 = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'delivery' as package_type, pme.created_at as event_created_at from packagemovement_events pme
                 INNER JOIN package p ON p.latest_event_id = pme.id
                 INNER JOIN facility ef ON(pme.location = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
@@ -705,15 +705,15 @@ class restrackController extends Controller
                 WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
             
             // Get prepared packages (newly prepared packages waiting for pickup)
-            $query2 = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, sf.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'prepared' as package_type from package p
+            $query2 = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, sf.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'prepared' as package_type, p.created_at as event_created_at from package p
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
                 WHERE p.created_by = " . $cat_id . " AND p.status = 0 AND p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
                 AND NOT EXISTS (SELECT 1 FROM packagemovement_events pme WHERE pme.package_id = p.id)";
             
-            // Combine both queries with UNION
-            $query = "(" . $query1 . ") UNION (" . $query2 . ") ORDER BY created_at DESC";
+            // Combine both queries with UNION and order by the consistent column name
+            $query = "(" . $query1 . ") UNION (" . $query2 . ") ORDER BY event_created_at DESC";
         } else {
             $query = "SELECT p.barcode,sf.name as source_facility,fd.name as final_destination, ef.name as last_location FROM `package` p 
             INNER JOIN packagemovement_events pme ON (p.latest_event_id = pme.id)
