@@ -694,13 +694,26 @@ class restrackController extends Controller
             // INNER JOIN facility sf ON(p.facilityid = sf.id)
             // INNER JOIN facility fd ON(p.final_destination = fd.id)
             // WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
-            $query = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples from packagemovement_events pme
+            
+            // Get packages with movement events (existing delivery packages)
+            $query1 = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'delivery' as package_type, pme.created_at as event_created_at from packagemovement_events pme
                 INNER JOIN package p ON p.latest_event_id = pme.id
                 INNER JOIN facility ef ON(pme.location = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
                 WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
+            
+            // Get prepared packages (newly prepared packages waiting for pickup)
+            $query2 = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, sf.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'prepared' as package_type, p.created_at as event_created_at from package p
+                INNER JOIN facility sf ON(p.facilityid = sf.id)
+                LEFT JOIN facility fd ON(p.final_destination = fd.id)
+                LEFT JOIN testtypes tt ON (p.test_type = tt.id)
+                WHERE p.created_by = " . $cat_id . " AND p.status = 0 AND p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                AND NOT EXISTS (SELECT 1 FROM packagemovement_events pme WHERE pme.package_id = p.id)";
+            
+            // Combine both queries with UNION and order by the consistent column name
+            $query = "(" . $query1 . ") UNION (" . $query2 . ") ORDER BY event_created_at DESC";
         } else {
             $query = "SELECT p.barcode,sf.name as source_facility,fd.name as final_destination, ef.name as last_location FROM `package` p 
             INNER JOIN packagemovement_events pme ON (p.latest_event_id = pme.id)
@@ -1814,8 +1827,28 @@ class restrackController extends Controller
                         'numberofsamples' => $packageData['numbeOfSamples'] ?? $packageData['numberOfSamples'] ?? 1,
                         'is_tracked_from_facility' => 1,
                         'is_batch' => 0,
+                        'status' => 0, // Set status to 0 (waiting for pickup)
                         'created_at' => now(),
                         'updated_at' => now()
+                    ]);
+
+                    // Create a PackageMovementEvent to make the package available for delivery
+                    $eventId = \DB::table('packagemovement_events')->insertGetId([
+                        'package_id' => $packageId,
+                        'source' => $facilityid,
+                        'destination' => $packageData['final_destination'] ?? '888',
+                        'status' => 0, // Status 0 = waiting for pickup
+                        'location' => $facilityid,
+                        'place_name' => $packageData['facility_name'] ?? 'Unknown Facility',
+                        'category_id' => $packageData['test_type'] ?? 1,
+                        'created_by' => $packageData['staffId'] ?? 1,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                    // Update the package with the latest event ID
+                    \DB::table('package')->where('id', $packageId)->update([
+                        'latest_event_id' => $eventId
                     ]);
 
                     // Store package info for notification
@@ -1961,10 +1994,20 @@ class restrackController extends Controller
     public function getPreparedPackages($userId)
     {
         try {
-            // Get packages created by the user
+            // Get packages created by the user with facility information
             $packages = \DB::table('package')
-                ->where('created_by', $userId)
-                ->orderBy('created_at', 'desc')
+                ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                ->where('package.created_by', $userId)
+                ->select(
+                    'package.id',
+                    'package.barcode',
+                    'package.numberofsamples',
+                    'package.created_at',
+                    'package.status',
+                    'package.final_destination',
+                    'facility.name as facility_name'
+                )
+                ->orderBy('package.created_at', 'desc')
                 ->get();
 
             // Format the response
@@ -1972,12 +2015,12 @@ class restrackController extends Controller
                 return [
                     'id' => $package->id,
                     'barcode' => $package->barcode,
-                    'packageName' => 'Prepared Package', // You might want to store this in the package table
-                    'packageType' => 'samples', // You might want to store this in the package table
-                    'numbeOfSamples' => $package->numberofsamples ?? '1',
-                    'facility_name' => 'Unknown Facility', // You might want to join with facilities table
+                    'packageName' => 'Prepared Package',
+                    'packageType' => 'samples',
+                    'numberOfSamples' => $package->numberofsamples ?? 1,
+                    'facility_name' => $package->facility_name ?? 'Unknown Facility',
                     'datePrepared' => $package->created_at,
-                    'status' => 'Prepared',
+                    'status' => $package->status == 0 ? 'Waiting for Pickup' : 'Prepared',
                     'created_at' => $package->created_at,
                 ];
             });
@@ -2002,4 +2045,5 @@ class restrackController extends Controller
             ], 500);
         }
     }
+
 }
