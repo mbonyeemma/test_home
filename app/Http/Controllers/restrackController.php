@@ -2029,7 +2029,13 @@ class restrackController extends Controller
             }
             
             $userFacilityId = $user->facilityid;
-            \Log::info('User facility ID for packages awaiting pickup', ['user_id' => $userId, 'user_facility_id' => $userFacilityId]);
+            \Log::info('User details for packages awaiting pickup', [
+                'user_id' => $userId, 
+                'user_facility_id' => $userFacilityId,
+                'user_hub_id' => $user->hubid,
+                'user_name' => $user->name ?? 'Unknown',
+                'full_user_record' => $user
+            ]);
             
             // Debug: Check what packages exist with status 0
             $debugPackages = \DB::table('package')
@@ -2042,55 +2048,83 @@ class restrackController extends Controller
                 'packages' => $debugPackages->toArray()
             ]);
             
-            // If user doesn't have a facility ID, return empty result
+            // If user doesn't have a facility ID, try to get it from hub or use hub-based filtering
             if (!$userFacilityId) {
-                \Log::warning('User has no facility ID, returning empty packages list', ['user_id' => $userId]);
-                return response()->json([
-                    'status' => 200,
-                    'message' => 'No packages awaiting pickup (user has no facility)',
-                    'packages' => []
+                \Log::warning('User has no facility ID, trying hub-based filtering', [
+                    'user_id' => $userId,
+                    'user_hub_id' => $user->hubid
                 ]);
+                
+                // Try to get packages based on hub instead
+                $userHubId = $user->hubid;
+                if (!$userHubId) {
+                    \Log::error('User has neither facility ID nor hub ID', ['user_id' => $userId]);
+                    return response()->json([
+                        'status' => 200,
+                        'message' => 'No packages awaiting pickup (user has no facility or hub)',
+                        'packages' => []
+                    ]);
+                }
+                
+                // Use hub-based filtering as fallback
+                $packages = \DB::table('package')
+                    ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                    ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
+                    ->where('package.status', 0)
+                    ->where('facility.hubid', $userHubId) // Filter by user's hub
+                    ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
+                    ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
+                    ->whereNotExists(function ($query) {
+                        $query->select(\DB::raw(1))
+                            ->from('packagemovement_events')
+                            ->whereRaw('packagemovement_events.package_id = package.id');
+                    })
+                    ->select(
+                        'package.id',
+                        'package.barcode',
+                        'package.numberofsamples',
+                        'package.created_at',
+                        'package.status',
+                        'package.final_destination',
+                        'package.test_type',
+                        'facility.name as facility_name',
+                        'testtypes.name as test_name'
+                    )
+                    ->orderBy('package.created_at', 'desc')
+                    ->get();
+                    
+                \Log::info('Using hub-based filtering', [
+                    'user_hub_id' => $userHubId,
+                    'packages_found' => $packages->count()
+                ]);
+            } else {
+                // Use facility-based filtering (original logic)
+                $packages = \DB::table('package')
+                    ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                    ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
+                    ->where('package.status', 0)
+                    ->where('package.facilityid', $userFacilityId) // Filter by user's facility
+                    ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
+                    ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
+                    ->whereNotExists(function ($query) {
+                        $query->select(\DB::raw(1))
+                            ->from('packagemovement_events')
+                            ->whereRaw('packagemovement_events.package_id = package.id');
+                    })
+                    ->select(
+                        'package.id',
+                        'package.barcode',
+                        'package.numberofsamples',
+                        'package.created_at',
+                        'package.status',
+                        'package.final_destination',
+                        'package.test_type',
+                        'facility.name as facility_name',
+                        'testtypes.name as test_name'
+                    )
+                    ->orderBy('package.created_at', 'desc')
+                    ->get();
             }
-            
-            // Debug: Check packages in user's facility
-            $debugFacilityPackages = \DB::table('package')
-                ->where('package.status', 0)
-                ->where('package.facilityid', $userFacilityId)
-                ->select('package.id', 'package.barcode', 'package.hubid', 'package.facilityid', 'package.created_at')
-                ->get();
-            
-            \Log::info('Debug: Packages with status 0 in user facility', [
-                'user_facility_id' => $userFacilityId,
-                'count' => $debugFacilityPackages->count(),
-                'packages' => $debugFacilityPackages->toArray()
-            ]);
-            
-            // Filter by user's facility - users can deliver packages for their facility
-            $packages = \DB::table('package')
-                ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
-                ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
-                ->where('package.status', 0)
-                ->where('package.facilityid', $userFacilityId) // Filter by user's facility
-                ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
-                ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
-                ->whereNotExists(function ($query) {
-                    $query->select(\DB::raw(1))
-                        ->from('packagemovement_events')
-                        ->whereRaw('packagemovement_events.package_id = package.id');
-                })
-                ->select(
-                    'package.id',
-                    'package.barcode',
-                    'package.numberofsamples',
-                    'package.created_at',
-                    'package.status',
-                    'package.final_destination',
-                    'package.test_type',
-                    'facility.name as facility_name',
-                    'testtypes.name as test_name'
-                )
-                ->orderBy('package.created_at', 'desc')
-                ->get();
 
             $formattedPackages = $packages->map(function ($package) {
                 return [
@@ -2125,6 +2159,8 @@ class restrackController extends Controller
             \Log::info('Fetched packages awaiting pickup for user', [
                 'user_id' => $userId,
                 'user_facility_id' => $userFacilityId,
+                'user_hub_id' => $user->hubid,
+                'filtering_method' => $userFacilityId ? 'facility-based' : 'hub-based',
                 'packages_count' => $formattedPackages->count(),
                 'raw_packages_count' => $packages->count()
             ]);
