@@ -2031,6 +2031,17 @@ class restrackController extends Controller
             $userHubId = $user->hubid;
             \Log::info('User hub ID for packages awaiting pickup', ['user_id' => $userId, 'user_hub_id' => $userHubId]);
             
+            // Debug: Check what packages exist with status 0
+            $debugPackages = \DB::table('package')
+                ->where('package.status', 0)
+                ->select('package.id', 'package.barcode', 'package.hubid', 'package.facilityid', 'package.created_at')
+                ->get();
+            
+            \Log::info('Debug: All packages with status 0', [
+                'count' => $debugPackages->count(),
+                'packages' => $debugPackages->toArray()
+            ]);
+            
             // If user doesn't have a hub ID, return empty result
             if (!$userHubId) {
                 \Log::warning('User has no hub ID, returning empty packages list', ['user_id' => $userId]);
@@ -2041,11 +2052,25 @@ class restrackController extends Controller
                 ]);
             }
             
+            // Debug: Check packages in user's hub
+            $debugHubPackages = \DB::table('package')
+                ->where('package.status', 0)
+                ->where('package.hubid', $userHubId)
+                ->select('package.id', 'package.barcode', 'package.hubid', 'package.facilityid', 'package.created_at')
+                ->get();
+            
+            \Log::info('Debug: Packages with status 0 in user hub', [
+                'user_hub_id' => $userHubId,
+                'count' => $debugHubPackages->count(),
+                'packages' => $debugHubPackages->toArray()
+            ]);
+            
+            // Try filtering by facility hub instead of package hub
             $packages = \DB::table('package')
                 ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
                 ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
                 ->where('package.status', 0)
-                ->where('package.hubid', $userHubId)
+                ->where('facility.hubid', $userHubId) // Filter by facility's hub instead of package's hub
                 ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
                 ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
                 ->whereNotExists(function ($query) {
