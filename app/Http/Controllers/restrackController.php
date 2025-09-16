@@ -2028,8 +2028,8 @@ class restrackController extends Controller
                 ], 404);
             }
             
-            $userHubId = $user->hubid;
-            \Log::info('User hub ID for packages awaiting pickup', ['user_id' => $userId, 'user_hub_id' => $userHubId]);
+            $userFacilityId = $user->facilityid;
+            \Log::info('User facility ID for packages awaiting pickup', ['user_id' => $userId, 'user_facility_id' => $userFacilityId]);
             
             // Debug: Check what packages exist with status 0
             $debugPackages = \DB::table('package')
@@ -2042,35 +2042,35 @@ class restrackController extends Controller
                 'packages' => $debugPackages->toArray()
             ]);
             
-            // If user doesn't have a hub ID, return empty result
-            if (!$userHubId) {
-                \Log::warning('User has no hub ID, returning empty packages list', ['user_id' => $userId]);
+            // If user doesn't have a facility ID, return empty result
+            if (!$userFacilityId) {
+                \Log::warning('User has no facility ID, returning empty packages list', ['user_id' => $userId]);
                 return response()->json([
                     'status' => 200,
-                    'message' => 'No packages awaiting pickup (user has no hub)',
+                    'message' => 'No packages awaiting pickup (user has no facility)',
                     'packages' => []
                 ]);
             }
             
-            // Debug: Check packages in user's hub
-            $debugHubPackages = \DB::table('package')
+            // Debug: Check packages in user's facility
+            $debugFacilityPackages = \DB::table('package')
                 ->where('package.status', 0)
-                ->where('package.hubid', $userHubId)
+                ->where('package.facilityid', $userFacilityId)
                 ->select('package.id', 'package.barcode', 'package.hubid', 'package.facilityid', 'package.created_at')
                 ->get();
             
-            \Log::info('Debug: Packages with status 0 in user hub', [
-                'user_hub_id' => $userHubId,
-                'count' => $debugHubPackages->count(),
-                'packages' => $debugHubPackages->toArray()
+            \Log::info('Debug: Packages with status 0 in user facility', [
+                'user_facility_id' => $userFacilityId,
+                'count' => $debugFacilityPackages->count(),
+                'packages' => $debugFacilityPackages->toArray()
             ]);
             
-            // Try filtering by facility hub instead of package hub
+            // Filter by user's facility - users can deliver packages for their facility
             $packages = \DB::table('package')
                 ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
                 ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
                 ->where('package.status', 0)
-                ->where('facility.hubid', $userHubId) // Filter by facility's hub instead of package's hub
+                ->where('package.facilityid', $userFacilityId) // Filter by user's facility
                 ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
                 ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
                 ->whereNotExists(function ($query) {
@@ -2124,7 +2124,7 @@ class restrackController extends Controller
 
             \Log::info('Fetched packages awaiting pickup for user', [
                 'user_id' => $userId,
-                'user_hub_id' => $userHubId,
+                'user_facility_id' => $userFacilityId,
                 'packages_count' => $formattedPackages->count(),
                 'raw_packages_count' => $packages->count()
             ]);
