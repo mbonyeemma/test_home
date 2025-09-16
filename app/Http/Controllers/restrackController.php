@@ -704,16 +704,9 @@ class restrackController extends Controller
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
                 WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
             
-            // Get prepared packages (newly prepared packages waiting for pickup)
-            $query2 = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, sf.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'prepared' as package_type, p.created_at as event_created_at from package p
-                INNER JOIN facility sf ON(p.facilityid = sf.id)
-                LEFT JOIN facility fd ON(p.final_destination = fd.id)
-                LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE p.created_by = " . $cat_id . " AND p.status = 0 AND p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
-                AND NOT EXISTS (SELECT 1 FROM packagemovement_events pme WHERE pme.package_id = p.id)";
-            
-            // Combine both queries with UNION and order by the consistent column name
-            $query = "(" . $query1 . ") UNION (" . $query2 . ") ORDER BY event_created_at DESC";
+            // Note: Prepared packages (status 0) are now handled separately in the Pick Sample Package screen
+            // Only include packages with movement events for delivery
+            $query = $query1 . " ORDER BY event_created_at DESC";
         } else {
             $query = "SELECT p.barcode,sf.name as source_facility,fd.name as final_destination, ef.name as last_location FROM `package` p 
             INNER JOIN packagemovement_events pme ON (p.latest_event_id = pme.id)
@@ -2042,6 +2035,101 @@ class restrackController extends Controller
             return response()->json([
                 'status' => 500,
                 'message' => 'Error fetching prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get packages awaiting pickup for Pick Sample Package screen
+     */
+    public function getPackagesAwaitingPickup($userId)
+    {
+        try {
+            // Get the user's hub to determine which packages they can see
+            $user = \DB::table('users')->where('id', $userId)->first();
+            if (!$user) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'User not found'
+                ], 404);
+            }
+            
+            $userHubId = $user->hubid;
+            
+            $packages = \DB::table('package')
+                ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
+                ->where('package.status', 0)
+                ->where('package.hubid', $userHubId)
+                ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
+                ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
+                ->whereNotExists(function ($query) {
+                    $query->select(\DB::raw(1))
+                        ->from('packagemovement_events')
+                        ->whereRaw('packagemovement_events.package_id = package.id');
+                })
+                ->select(
+                    'package.id',
+                    'package.barcode',
+                    'package.numberofsamples',
+                    'package.created_at',
+                    'package.status',
+                    'package.final_destination',
+                    'package.test_type',
+                    'facility.name as facility_name',
+                    'testtypes.name as test_name'
+                )
+                ->orderBy('package.created_at', 'desc')
+                ->get();
+
+            $formattedPackages = $packages->map(function ($package) {
+                return [
+                    'id' => $package->id,
+                    'barcode' => $package->barcode,
+                    'packageId' => $package->id,
+                    'name' => $package->test_name ?? 'Unknown Test',
+                    'hubid' => 1, // Default hub
+                    'numbeOfSamples' => $package->numberofsamples,
+                    'finalDestination' => $package->final_destination ?? '888',
+                    'staffId' => $package->created_by,
+                    'testType' => $package->test_type ?? 1,
+                    'type' => 'samples',
+                    'facilityid' => $package->facilityid,
+                    'placeName' => $package->facility_name,
+                    'longitude' => '0.0',
+                    'latitude' => '0.0',
+                    'datePicked' => $package->created_at,
+                    'samples' => '[]',
+                    'children' => '[]',
+                    'facility_name' => $package->facility_name,
+                    'synched' => 'false',
+                    'preparedBarcodeId' => '',
+                    'parentId' => null,
+                    'testTypeName' => $package->test_name ?? 'Unknown Test',
+                    'selectedType' => 'samples',
+                    'source_facility' => $package->facility_name,
+                    'status' => 'Awaiting Pickup'
+                ];
+            });
+
+            \Log::info('Fetched packages awaiting pickup for user', [
+                'user_id' => $userId,
+                'user_hub_id' => $userHubId,
+                'packages_count' => $formattedPackages->count()
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Packages awaiting pickup fetched successfully',
+                'packages' => $formattedPackages
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching packages awaiting pickup: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching packages awaiting pickup: ' . $e->getMessage()
             ], 500);
         }
     }
