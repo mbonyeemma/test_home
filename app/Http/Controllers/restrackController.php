@@ -686,26 +686,14 @@ class restrackController extends Controller
         } elseif ($categrory == 'all_undelivered') {
             $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND created_at between (CURDATE() - INTERVAL 2 MONTH ) and (CURDATE() + 1 )";
         } elseif ($categrory == 'user') {
-            //change
-
-            // $query = "SELECT p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id from packagemovement_events pme
-            // INNER JOIN package p ON p.latest_event_id = pme.id
-            // INNER JOIN facility ef ON(pme.location = ef.id)
-            // INNER JOIN facility sf ON(p.facilityid = sf.id)
-            // INNER JOIN facility fd ON(p.final_destination = fd.id)
-            // WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
-            
-            // Get packages with movement events (existing delivery packages)
             $query1 = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'delivery' as package_type, pme.created_at as event_created_at from packagemovement_events pme
                 INNER JOIN package p ON p.latest_event_id = pme.id
                 INNER JOIN facility ef ON(pme.location = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
+                WHERE pme.status < 2 AND p.status > 0 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
             
-            // Note: Prepared packages (status 0) are now handled separately in the Pick Sample Package screen
-            // Only include packages with movement events for delivery
             $query = $query1 . " ORDER BY event_created_at DESC";
         } else {
             $query = "SELECT p.barcode,sf.name as source_facility,fd.name as final_destination, ef.name as last_location FROM `package` p 
@@ -1825,24 +1813,9 @@ class restrackController extends Controller
                         'updated_at' => now()
                     ]);
 
-                    // Create a PackageMovementEvent to make the package available for delivery
-                    $eventId = \DB::table('packagemovement_events')->insertGetId([
-                        'package_id' => $packageId,
-                        'source' => $facilityid,
-                        'destination' => $packageData['final_destination'] ?? '888',
-                        'status' => 0, // Status 0 = waiting for pickup
-                        'location' => $facilityid,
-                        'place_name' => $packageData['facility_name'] ?? 'Unknown Facility',
-                        'category_id' => $packageData['test_type'] ?? 1,
-                        'created_by' => $packageData['staffId'] ?? 1,
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-
-                    // Update the package with the latest event ID
-                    \DB::table('package')->where('id', $packageId)->update([
-                        'latest_event_id' => $eventId
-                    ]);
+                    // Note: Prepared packages (status 0) do NOT get movement events
+                    // Movement events are only created when packages are picked up (status 1+)
+                    // This ensures they appear in the "packages awaiting pickup" list
 
                     // Store package info for notification
                     $savedPackages[] = [
@@ -2048,6 +2021,7 @@ class restrackController extends Controller
             // Get the user's hub to determine which packages they can see
             $user = \DB::table('users')->where('id', $userId)->first();
             if (!$user) {
+                \Log::error('User not found for packages awaiting pickup', ['user_id' => $userId]);
                 return response()->json([
                     'status' => 404,
                     'message' => 'User not found'
@@ -2055,6 +2029,17 @@ class restrackController extends Controller
             }
             
             $userHubId = $user->hubid;
+            \Log::info('User hub ID for packages awaiting pickup', ['user_id' => $userId, 'user_hub_id' => $userHubId]);
+            
+            // If user doesn't have a hub ID, return empty result
+            if (!$userHubId) {
+                \Log::warning('User has no hub ID, returning empty packages list', ['user_id' => $userId]);
+                return response()->json([
+                    'status' => 200,
+                    'message' => 'No packages awaiting pickup (user has no hub)',
+                    'packages' => []
+                ]);
+            }
             
             $packages = \DB::table('package')
                 ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
@@ -2115,7 +2100,8 @@ class restrackController extends Controller
             \Log::info('Fetched packages awaiting pickup for user', [
                 'user_id' => $userId,
                 'user_hub_id' => $userHubId,
-                'packages_count' => $formattedPackages->count()
+                'packages_count' => $formattedPackages->count(),
+                'raw_packages_count' => $packages->count()
             ]);
 
             return response()->json([
