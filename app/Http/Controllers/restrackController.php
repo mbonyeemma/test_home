@@ -1460,48 +1460,42 @@ class restrackController extends Controller
                 }
                 $package_arr['is_tracked_from_facility'] = 1;
                 // $package->save(); 
-                // Check if package already exists
-                $existingPackage = Package::where('barcode', '=', $post_data['barcode'])->first();
-                
-                if (!$existingPackage) {
-                    // Create new package if it doesn't exist
-                    $package = Package::create($package_arr);
-                    $package_id = $package->id;
-                } else {
-                    // Update existing package
-                    $existingPackage->update($package_arr);
-                    $package = $existingPackage;
-                    $package_id = $package->id;
-                }
-                
-                // Create event for both new and existing packages
-                $event = $this->createEvent($post_data, $package_id, $event_status);
-                $package->latest_event_id = $event->id;
-                $package->save();
-                
-                //update the children with the status of their parent
-                if (isset($post_data['children']) && $post_data['children'] != '') {
-                    $this->setParentForChildrenPackages($post_data['children'], $package->id, $event->id, $post_data);
-                }
-                //in case ther are any samples, save them
-                if (isset($post_data['samples']) && $post_data['samples'] != '') {
-                    //save each sample
-                    $this->createSamples($post_data, $package->id, $event->id, $hub_id);
-                }
-                
-                //add notifications
-                $facility = Facility::find($package->facilityid);
+                if (!Package::where('barcode', '=', $post_data['barcode'])->first()) {
+                    //validate samples
 
-                // Check if the hub exists and required values are present
-                if ($facility) {
-                    $notifier->sendNotification(
-                        $facility->email,
-                        'Hello, package created successfully'
-                    );
-                } else {
-                    Log::warning('Notification not sent: Hub not found or results missing', [
-                        'facility'      => $package->facilityid,
-                    ]);
+                    //dd('created object');
+                    $package = Package::create($package_arr);
+                    //now save the event
+                    $event = $this->createEvent($post_data, $package->id, $event_status);
+                    $package->latest_event_id = $event->id;
+                    // if ($package->final_destination == 0) {
+                    //     $package->final_destination = 2490;
+                    // }
+
+                    $package->save();
+                    //update the children with the status of their parent
+                    if (isset($post_data['children']) && $post_data['children'] != '') {
+                        $this->setParentForChildrenPackages($post_data['children'], $package->id, $event->id, $post_data);
+                    }
+                    //in case ther are any samples, save them
+                    if (isset($post_data['samples']) && $post_data['samples'] != '') {
+                        //save each sample
+                        $this->createSamples($post_data, $package->id, $event->id, $hub_id);
+                    }
+                    //add notifications
+                    $facility = Facility::find($package->facilityid);
+
+                    // Check if the hub exists and required values are present
+                    if ($facility) {
+                        $notifier->sendNotification(
+                            $facility->email,
+                            'Hello, package created successfully'
+                        );
+                    } else {
+                        Log::warning('Notification not sent: Hub not found or results missing', [
+                            'facility'      => $package->facilityid,
+                        ]);
+                    }
                 }
             });
             $ret['status'] = 200;
