@@ -155,18 +155,27 @@ class UserController extends Controller {
     public function update(Request $request, $id) {
         $user = User::findOrFail($id); //Get role specified by id
 
-    //Validate name, email and password fields  
-        $this->validate($request, [
+        // Base validation rules
+        $validationRules = [
             'name'=>'required|max:120',
             'email'=>'required|email|unique:users,email,'.$id,
-            'password'=>'required|min:6|confirmed',
             'roles' => 'required|array|min:1' // Allow unlimited roles
-        ]);
-       // $input = $request->only(['name', 'email', 'password']); 
+        ];
+
+        // Add password validation only if change password checkbox is checked
+        if($request->has('change_password') && $request->change_password) {
+            $validationRules['password'] = 'required|confirmed';
+            $validationRules['password_confirmation'] = 'required';
+        }
+
+        $this->validate($request, $validationRules);
+
         $roles = $request['roles']; //Retreive all roles
 		$user->email = $request->email;
 		$user->name = $request->name;
-		if(!empty($request->password)){
+		
+		// Only update password if change password checkbox is checked and password is provided
+		if($request->has('change_password') && $request->change_password && !empty($request->password)){
 			$user->setPasswordAttribute($request->password);
 		}
 		if(!empty($request->hubid)){

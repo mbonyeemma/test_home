@@ -53,6 +53,23 @@
                 $('#ips').removeClass('hidden');
             <?php }?>
 		
+		// Toggle password fields visibility
+		$('#change_password').change(function(){
+			if($(this).is(':checked')){
+				$('#password_fields, #password_confirmation_fields').show();
+				// Enable validation for password fields
+				$('#userform').bootstrapValidator('enableFieldValidators', 'password', true);
+				$('#userform').bootstrapValidator('enableFieldValidators', 'password_confirmation', true);
+			}else{
+				$('#password_fields, #password_confirmation_fields').hide();
+				// Clear password field values
+				$('#password, #password_confirmation').val('');
+				// Disable validation for password fields
+				$('#userform').bootstrapValidator('enableFieldValidators', 'password', false);
+				$('#userform').bootstrapValidator('enableFieldValidators', 'password_confirmation', false);
+			}
+		});
+		
 		$('#userform').bootstrapValidator({
        
         fields: {
@@ -82,11 +99,9 @@
 				validators: {
 							notEmpty: {
 								message: 'Please enter a password'
-							},
-							securePassword: {
-								message: 'The password is not valid'
 							}
-						}
+						},
+						enabled: false
 					},
 				password_confirmation: {
                 validators: {
@@ -97,7 +112,8 @@
                         field: 'password',
                         message: 'The passwords do not match'
 						}
-					}
+					},
+					enabled: false
 				},
 				email: {          
 				validators: {
@@ -167,15 +183,22 @@
         {{ Form::select('organisation_id', $ips, null, ['class' => 'form-control']) }}
     </div>
     <div class="form-group">
-        {{ Form::label('password', 'Password') }}<br>
-        {{ Form::password('password', array('class' => 'form-control')) }}
-
+        <div class="checkbox">
+            <label>
+                {{ Form::checkbox('change_password', '1', false, ['id' => 'change_password']) }}
+                Change User Password
+            </label>
+        </div>
     </div>
 
-    <div class="form-group">
-        {{ Form::label('password', 'Confirm Password') }}<br>
-        {{ Form::password('password_confirmation', array('class' => 'form-control')) }}
+    <div id="password_fields" class="form-group" style="display: none;">
+        {{ Form::label('password', 'Password') }}<br>
+        {{ Form::password('password', array('class' => 'form-control', 'id' => 'password')) }}
+    </div>
 
+    <div id="password_confirmation_fields" class="form-group" style="display: none;">
+        {{ Form::label('password_confirmation', 'Confirm Password') }}<br>
+        {{ Form::password('password_confirmation', array('class' => 'form-control', 'id' => 'password_confirmation')) }}
     </div>
 </div>
               <!-- /.box-body -->
