@@ -350,6 +350,10 @@ class restrackController extends Controller
                 foreach ($request['barcodes'] as $barcode) {
 
                     $package = Package::where('barcode', '=', $barcode)->first();
+                    if (!$package) {
+                        \Log::warning("Package not found for barcode: " . $barcode);
+                        continue;
+                    }
 
                     $request['source'] = $package->facilityid;
                     if (isset($request['destination']) && $request['destination'] != '') {
@@ -409,7 +413,11 @@ class restrackController extends Controller
             \DB::transaction(function () use ($request, $ret_arr, &$delivered_packages, &$delivery_facilities) {
                 //\Log::info($request);
                 foreach ($request['barcodes'] as $barcode) {
-                    $package = Package::where('id', '=', $barcode)->first();
+                    $package = Package::where('barcode', '=', $barcode)->first();
+                    if (!$package) {
+                        \Log::warning("Package not found for barcode: " . $barcode);
+                        continue;
+                    }
                     $request['source'] = $package->facilityid;
                     if (isset($request['destination']) && ($request['destination'] != '' || $request['destination'] == '000')) {
                         $request['final_destination'] = $request['destination'];
