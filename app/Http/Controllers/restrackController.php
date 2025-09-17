@@ -436,6 +436,8 @@ class restrackController extends Controller
                     // Update the package status
                     $package->status = $request['status'];
                     $package->save();
+                    
+                    \Log::info("Package status updated - ID: {$package->id}, Barcode: {$package->barcode}, Status: {$request['status']}");
 
                     //if the status is 2 (delivered), set the deliverer of the package
                     $update_str = '';
@@ -459,13 +461,13 @@ class restrackController extends Controller
                     }
                     //get all children of the packag and update and parent package
                     if ($package->type == 2) {
-                        $query = "UPDATE package SET latest_event_id = " . $event->id . $update_str . " WHERE parent_id = " . $package->id . " OR id = " . $package->id;
+                        $query = "UPDATE package SET latest_event_id = " . $event->id . ", status = " . $request['status'] . $update_str . " WHERE parent_id = " . $package->id . " OR id = " . $package->id;
                     } else {
-                        $package_update_query = "UPDATE package SET latest_event_id = " . $event->id . $update_str . " WHERE id = " . $package->id;
+                        $package_update_query = "UPDATE package SET latest_event_id = " . $event->id . ", status = " . $request['status'] . $update_str . " WHERE id = " . $package->id;
                         \DB::unprepared($package_update_query);
                         $query = "UPDATE samples SET latest_event_id = " . $event->id . " WHERE package_id = " . $package->id;
                     }
-                    //\Log::info($query);
+                    \Log::info("Executing SQL query: " . $query);
                     \DB::unprepared($query);
                 }
             });
