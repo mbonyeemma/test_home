@@ -425,6 +425,10 @@ class restrackController extends Controller
                     $request['test_type'] = $package->test_type;
                     $event = $this->createEvent($request, $package->id, $request['status']);
 
+                    // Update the package status
+                    $package->status = $request['status'];
+                    $package->save();
+
                     //if the status is 2 (delivered), set the deliverer of the package
                     $update_str = '';
                     if ($request['status']  == 2) {
@@ -561,10 +565,10 @@ class restrackController extends Controller
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
-        IF(pk.status = 1, 'PICKED', 
+        IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )";
         // FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
         // (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )
@@ -582,10 +586,10 @@ class restrackController extends Controller
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
-        IF(pk.status = 1, 'PICKED', 
+        IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )";
         // LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
@@ -604,10 +608,10 @@ class restrackController extends Controller
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
-        IF(pk.status = 1, 'PICKED', 
+        IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 2 WEEK ) and (CURDATE() + 1 )";
         // -- LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
@@ -626,10 +630,10 @@ class restrackController extends Controller
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
-        IF(pk.status = 1, 'PICKED', 
+        IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND pk.id > '" . $id . "'";
 
