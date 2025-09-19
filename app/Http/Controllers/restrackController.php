@@ -1783,6 +1783,7 @@ class restrackController extends Controller
             $savedPackages = [];
             $samples = [];
             $errors = [];
+            $skippedDuplicates = 0;
 
             // Save each package to database
             foreach ($packages as $index => $packageData) {
@@ -1793,10 +1794,11 @@ class restrackController extends Controller
                         continue;
                     }
 
-                    // Check if barcode already exists
+                    // Check if barcode already exists - if it does, skip it silently
                     $existingPackage = \DB::table('package')->where('barcode', $packageData['barcode'])->first();
                     if ($existingPackage) {
-                        $errors[] = "Package at index {$index}: Barcode {$packageData['barcode']} already exists";
+                        $skippedDuplicates++;
+                        \Log::info("Package barcode {$packageData['barcode']} already exists, skipping...");
                         continue;
                     }
 
@@ -1858,6 +1860,10 @@ class restrackController extends Controller
 
             // If there were errors and no packages were saved, return error
             if (empty($savedPackages) && !empty($errors)) {
+                \Log::warning("No packages were saved and there are errors", [
+                    'errors' => $errors,
+                    'total_packages' => count($packages)
+                ]);
                 return response()->json([
                     'status' => 400,
                     'message' => 'Failed to save any packages',
@@ -1887,6 +1893,7 @@ class restrackController extends Controller
             
             \Log::info('Prepared packages saved and notification sent', [
                 'packages_count' => count($savedPackages),
+                'skipped_duplicates' => $skippedDuplicates,
                 'errors_count' => count($errors),
                 'notification_response' => $notificationResponse
             ]);
@@ -1897,6 +1904,7 @@ class restrackController extends Controller
                 'data' => [
                     'saved_packages' => $savedPackages,
                     'saved_count' => count($savedPackages),
+                    'skipped_duplicates' => $skippedDuplicates,
                     'total_requested' => count($packages)
                 ]
             ];
