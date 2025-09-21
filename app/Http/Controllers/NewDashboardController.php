@@ -854,9 +854,9 @@ class NewDashboardController extends Controller
     public function totalNumberofSamplesDeliveredAtHub()
     {
         $query = "SELECT distinct FORMAT(sum(p.numberofsamples), 0) as total from package p
-                inner join packagemovement_events pe ON pe.package_id = p.id
-                inner join testtypes tt ON p.test_type = tt.id
-                where pe.location = p.hubid 
+                LEFT JOIN packagemovement_events pe ON pe.package_id = p.id AND pe.location = p.hubid
+                INNER JOIN testtypes tt ON p.test_type = tt.id
+                WHERE (pe.location = p.hubid OR (p.status > 0 AND pe.location IS NULL))
                 AND p.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)";
         $total_samples = \DB::select($query);
         echo $total_samples[0]->total;
@@ -872,14 +872,14 @@ class NewDashboardController extends Controller
                     f.name as hub_name,
                     ds.name as district,
                     r.name as region,
-                    pe.created_at as delivered_at
+                    COALESCE(pe.created_at, p.updated_at) as delivered_at
                 FROM package p
-                INNER JOIN packagemovement_events pe ON pe.package_id = p.id
+                LEFT JOIN packagemovement_events pe ON pe.package_id = p.id AND pe.location = p.hubid
                 INNER JOIN testtypes tt ON p.test_type = tt.id
                 INNER JOIN facility f ON p.hubid = f.id
                 LEFT JOIN district ds ON f.districtid = ds.id
                 LEFT JOIN region r ON ds.regionid = r.id
-                WHERE pe.location = p.hubid 
+                WHERE (pe.location = p.hubid OR (p.status > 0 AND pe.location IS NULL))
                 AND p.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
                 ORDER BY p.created_at DESC
                 LIMIT 50";
