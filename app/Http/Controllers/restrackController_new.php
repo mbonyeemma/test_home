@@ -250,7 +250,6 @@ class restrackController extends Controller
 
     public function createPackage_new(Request $request)
     {
-        dd("asdasdasd");
         $ret = $messages = array();
         $post_data = $request;
 
@@ -1108,24 +1107,66 @@ class restrackController extends Controller
                 //     $error_messages[] = $return_msg;
                 // } else 
                 // {
-                // dd("created object");
-                $exist_package = Package::where('barcode', '=', $post_data['package_identifier'])->first();
+                $exist_package = Package::where('barcode', '=', $post_data['barcode'])->first();
 
                 if ($exist_package != null) {
+                    \Log::info('Package found with barcode: ' . $post_data['barcode'] . ', updating with status: ' . (isset($post_data['status']) ? $post_data['status'] : 'default'));
                     $package = $exist_package;
+                    
+                    $package->facilityid = $post_data['facilityid'];
+                    $package->hubid = $hub_id;
+                    $package->test_type = $post_data['test_type'];
+                    $package->sample_type = $post_data['sample_type'];
+                    $package->date_picked = $post_data['date_picked'];
+                    $package->created_by = $post_data['user_id'];
+                    
+                    if (isset($post_data['final_destination']) && $post_data['final_destination'] != '') {
+                        $package->final_destination = $post_data['final_destination'];
+                    } else {
+                        $t_type = TestType::findOrFail($post_data['test_type']);
+                        $package->final_destination = $t_type->ref_lab;
+                        $post_data['final_destination'] = $t_type->ref_lab;
+                    }
+                    
+                    // Update package type and sample count
+                    if (isset($post_data['children']) && $post_data['children'] != '') {
+                        $package->type = 2;
+                        $event_status = 5;
+                    } else {
+                        $package->type = 1;
+                    }
+                    
+                    if (isset($post_data['samples']) && $post_data['samples'] != '') {
+                        $package->numberofsamples = count($post_data['samples']);
+                        $package->is_batch = 0;
+                    } else {
+                        $package->numberofsamples = $post_data['number_of_samples'];
+                        $package->is_batch = 1;
+                    }
+                    
+                    $package->is_tracked_from_facility = 1;
+                    
+                    if (isset($post_data['status']) && $post_data['status'] != '') {
+                        $event_status = $post_data['status'];
+                        $package->status = $post_data['status'];
+                    }
+                    
                 } else {
+                    \Log::info('Package not found with barcode: ' . $post_data['barcode'] . ', creating new package');
+                    $package_arr['status'] = $event_status;
                     $package = Package::create($package_arr);
                 }
-                // dd($exist_package);
 
-                //now save the event
+                \Log::info('Creating event for package ID: ' . $package->id . ' with status: ' . $event_status);
                 $event = $this->createEvent($post_data, $package->id, $event_status);
                 $package->latest_event_id = $event->id;
+                
                 if ($package->final_destination == 0) {
                     $package->final_destination = 2490;
                 }
 
                 $package->save();
+                \Log::info('Package saved with ID: ' . $package->id . ', Status: ' . $package->status . ', Barcode: ' . $package->barcode);
 
                 //update the children with the status of their parent
                 if (isset($post_data['children']) && $post_data['children'] != '') {
