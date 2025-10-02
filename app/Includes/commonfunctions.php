@@ -743,3 +743,29 @@ function time_elapsed($secs){
  	}
  	return $obj_arr;
  }
+
+ /**
+  * Generate timezone-aware date filter for database queries
+  * This ensures consistent behavior across all servers regardless of timezone differences
+  * 
+  * @param int $days_back Number of days to look back (default: 30)
+  * @return string SQL WHERE clause for date filtering
+  */
+ function getTimezoneAwareDateFilter($days_back = 30) {
+     return " BETWEEN DATE_SUB(NOW(), INTERVAL " . $days_back . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)";
+ }
+
+ /**
+  * Get timezone-aware date filter using environment variable
+  * Uses NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES from environment
+  * 
+  * @return string SQL WHERE clause for date filtering
+  */
+ function getTimezoneAwarePackageDateFilter() {
+     if (function_exists('env')) {
+         $cut_off_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES', 30);
+     } else {
+         $cut_off_days = 30; // Default fallback
+     }
+     return getTimezoneAwareDateFilter($cut_off_days);
+ }

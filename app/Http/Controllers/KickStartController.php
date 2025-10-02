@@ -62,7 +62,7 @@ class KickStartController extends Controller
 		//$where = " WHERE p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE()";;
 		$cut_off_number_of_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES');
 		//$where_package = $where  = "  AND p.created_at BETWEEN CURDATE() - INTERVAL ".env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES')." DAY AND CURDATE() + 1";
-		$where_package = $where  = "  AND p.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES') . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)";
+        $where_package = $where  = "  AND p.created_at" . getTimezoneAwarePackageDateFilter();
 		$graph_where_clause = " AND date_picked BETWEEN CURDATE() - INTERVAL " . env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES') . " DAY AND CURDATE() + 1";
 
 		$test_type_cond = '';

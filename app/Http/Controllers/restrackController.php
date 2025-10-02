@@ -579,7 +579,7 @@ class restrackController extends Controller
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
         IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
-        FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )";
+        FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND pk.created_at" . getTimezoneAwareDateFilter(30);
         // FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
         // (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )
         $db_data = \DB::select($query);
@@ -592,7 +592,6 @@ class restrackController extends Controller
     public function getPackagesPerDate_new_id($provided_date)
     {
         // Use timezone-aware date filtering with buffer to handle timezone differences
-        $cut_off_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES', 30);
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
@@ -603,7 +602,7 @@ class restrackController extends Controller
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
-        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . $cut_off_days . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+        AND pk.created_at" . getTimezoneAwarePackageDateFilter() . "
         ORDER BY pk.created_at DESC";
         
         $db_data = \DB::select($query);
@@ -616,7 +615,6 @@ class restrackController extends Controller
     public function getPackagesPerDate($provided_date)
     {
         // Use timezone-aware date filtering with buffer to handle timezone differences
-        $cut_off_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES', 30);
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
@@ -627,7 +625,7 @@ class restrackController extends Controller
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
-        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . $cut_off_days . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+        AND pk.created_at" . getTimezoneAwarePackageDateFilter() . "
         ORDER BY pk.created_at DESC";
 
         $db_data = \DB::select($query);
@@ -640,7 +638,6 @@ class restrackController extends Controller
     public function getPackagesPerDate_byId($id)
     {
         // Use timezone-aware date filtering with buffer to handle timezone differences
-        $cut_off_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES', 30);
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
@@ -652,7 +649,7 @@ class restrackController extends Controller
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
         AND pk.id > '" . $id . "'
-        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . $cut_off_days . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+        AND pk.created_at" . getTimezoneAwarePackageDateFilter() . "
         ORDER BY pk.id ASC";
 
         $db_data = \DB::select($query);
@@ -708,9 +705,9 @@ class restrackController extends Controller
         if ($categrory == 'single') {
             $query = "SELECT id, barcode FROM package WHERE barcode = '" . $cat_id . "'";
         } elseif ($categrory == 'all') {
-            $query = "SELECT id, barcode FROM package WHERE created_at between (CURDATE() - INTERVAL 2 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
+            $query = "SELECT id, barcode FROM package WHERE created_at" . getTimezoneAwareDateFilter(60);
         } elseif ($categrory == 'all_undelivered') {
-            $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND created_at between (CURDATE() - INTERVAL 2 MONTH ) and (CURDATE() + 1 )";
+            $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND created_at" . getTimezoneAwareDateFilter(60);
         } elseif ($categrory == 'user') {
             $query1 = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'delivery' as package_type, pme.created_at as event_created_at from packagemovement_events pme
                 INNER JOIN package p ON p.latest_event_id = pme.id
@@ -718,7 +715,7 @@ class restrackController extends Controller
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE pme.status < 2 AND p.status > 0 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
+                WHERE pme.status < 2 AND p.status > 0 AND pme.created_by = " . $cat_id . " AND pme.created_at" . getTimezoneAwareDateFilter(30);
             
             $query = $query1 . " ORDER BY event_created_at DESC";
         } else {
@@ -750,7 +747,7 @@ class restrackController extends Controller
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE p.delivered_by = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                WHERE p.delivered_by = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on" . getTimezoneAwareDateFilter(90) . "
                 ORDER BY p.delivered_on DESC";
         } elseif ($categrory == 'facility') {
             $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
@@ -758,7 +755,7 @@ class restrackController extends Controller
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE p.facilityid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                WHERE p.facilityid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on" . getTimezoneAwareDateFilter(90) . "
                 ORDER BY p.delivered_on DESC";
         } elseif ($categrory == 'hub') {
             $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
@@ -766,7 +763,7 @@ class restrackController extends Controller
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE p.hubid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                WHERE p.hubid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on" . getTimezoneAwareDateFilter(90) . "
                 ORDER BY p.delivered_on DESC";
         } else {
             $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
@@ -2147,8 +2144,7 @@ class restrackController extends Controller
                     ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
                     ->where('package.status', 0)
                     ->where('facility.hubid', $userHubId) // Filter by user's hub
-                    ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
-                    ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
+                    ->whereRaw('package.created_at' . getTimezoneAwareDateFilter(30))
                     ->whereNotExists(function ($query) {
                         $query->select(\DB::raw(1))
                             ->from('packagemovement_events')
@@ -2179,8 +2175,7 @@ class restrackController extends Controller
                     ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
                     ->where('package.status', 0)
                     ->where('package.facilityid', $userFacilityId) // Filter by user's facility
-                    ->where('package.created_at', '>=', \DB::raw('CURDATE() - INTERVAL 1 MONTH'))
-                    ->where('package.created_at', '<=', \DB::raw('CURDATE() + INTERVAL 1 DAY'))
+                    ->whereRaw('package.created_at' . getTimezoneAwareDateFilter(30))
                     ->whereNotExists(function ($query) {
                         $query->select(\DB::raw(1))
                             ->from('packagemovement_events')
