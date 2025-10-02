@@ -637,6 +637,7 @@ class restrackController extends Controller
 
     public function getPackagesPerDate_byId($id)
     {
+        // Modified to return ALL packages regardless of ID parameter (for mobile app compatibility)
         // Use timezone-aware date filtering with buffer to handle timezone differences
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
@@ -648,7 +649,6 @@ class restrackController extends Controller
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
-        AND pk.id > '" . $id . "'
         AND pk.created_at" . getTimezoneAwarePackageDateFilter() . "
         ORDER BY pk.id ASC";
 
