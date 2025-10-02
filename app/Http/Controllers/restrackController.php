@@ -637,8 +637,8 @@ class restrackController extends Controller
 
     public function getPackagesPerDate_byId($id)
     {
-        // Modified to return ALL packages regardless of ID parameter (for mobile app compatibility)
-        // Use timezone-aware date filtering with buffer to handle timezone differences
+        // Modified to return packages from last 30 days regardless of ID parameter (for mobile app compatibility)
+        // Hardcoded 30-day limit with timezone-aware filtering to handle timezone differences
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
@@ -649,7 +649,7 @@ class restrackController extends Controller
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
-        AND pk.created_at" . getTimezoneAwarePackageDateFilter() . "
+        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
         ORDER BY pk.id ASC";
 
         $db_data = \DB::select($query);
