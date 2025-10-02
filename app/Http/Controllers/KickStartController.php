@@ -62,7 +62,7 @@ class KickStartController extends Controller
 		//$where = " WHERE p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE()";;
 		$cut_off_number_of_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES');
 		//$where_package = $where  = "  AND p.created_at BETWEEN CURDATE() - INTERVAL ".env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES')." DAY AND CURDATE() + 1";
-		$where_package = $where  = "  AND p.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES') . " DAY) AND NOW()";
+		$where_package = $where  = "  AND p.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES') . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)";
 		$graph_where_clause = " AND date_picked BETWEEN CURDATE() - INTERVAL " . env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES') . " DAY AND CURDATE() + 1";
 
 		$test_type_cond = '';
@@ -114,10 +114,10 @@ IF(sf.facilitylevelid = 14,'Poe',IF(sf.id = 899991,'Quarantine',IF(sf.id = 89999
 IF(sf.id = 899991 OR sf.id = 899992 OR sf.id = 900000, p.place_name, sf.name) as collection_point_name,
 IF(sf.id = 899991 OR sf.id = 899992 OR sf.id = 900000, '', d.name) as `district`,
 IF(sf.id = 899991 OR sf.id = 899992 OR sf.id = 900000, '', h.name) as `hub` FROM package p
-LEFT JOIN packagemovement_events le on(le.id = p.latest_event_id)
+LEFT JOIN packagemovement_events le ON (le.id = p.latest_event_id)
 INNER JOIN facility sf ON(sf.id = p.facilityid)
 LEFT JOIN facility h ON(h.id = sf.parentid)
-INNER JOIN district d ON(d.id = sf.districtid)
+LEFT JOIN district d ON(d.id = sf.districtid)
 LEFT JOIN facility fd ON(fd.id = p.final_destination)
 LEFT JOIN facility pmef ON(pmef.id = le.location)
 INNER JOIN testtypes tt ON(tt.id = p.test_type)

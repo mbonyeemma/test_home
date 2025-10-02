@@ -591,8 +591,8 @@ class restrackController extends Controller
 
     public function getPackagesPerDate_new_id($provided_date)
     {
-        // dd("sdfsdfd");
-        // SELECT id, barcode FROM package WHERE delivered_on IS NULL AND created_at > '2018-05-29 13:02:44'
+        // Use timezone-aware date filtering with buffer to handle timezone differences
+        $cut_off_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES', 30);
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
@@ -601,8 +601,11 @@ class restrackController extends Controller
         IF(pk.status = 3,'RECEIVED', 
         IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
-        LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )";
-        // LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
+        LEFT JOIN facility fa ON pk.facilityid = fa.id 
+        WHERE pk.delivered_on IS NULL 
+        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . $cut_off_days . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+        ORDER BY pk.created_at DESC";
+        
         $db_data = \DB::select($query);
         $ret_arr = ['samples' => array_values($db_data)];
         $ret_arr['status'] = 200;
@@ -612,9 +615,8 @@ class restrackController extends Controller
 
     public function getPackagesPerDate($provided_date)
     {
-
-        // SELECT id, barcode FROM package WHERE delivered_on IS NULL AND created_at > '2018-05-29 13:02:44'
-        // $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND DATE(created_at) = '" . $provided_date . "'";
+        // Use timezone-aware date filtering with buffer to handle timezone differences
+        $cut_off_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES', 30);
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
@@ -623,8 +625,10 @@ class restrackController extends Controller
         IF(pk.status = 3,'RECEIVED', 
         IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
-        LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 2 WEEK ) and (CURDATE() + 1 )";
-        // -- LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
+        LEFT JOIN facility fa ON pk.facilityid = fa.id 
+        WHERE pk.delivered_on IS NULL 
+        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . $cut_off_days . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+        ORDER BY pk.created_at DESC";
 
         $db_data = \DB::select($query);
         $ret_arr = ['samples' => array_values($db_data)];
@@ -635,8 +639,8 @@ class restrackController extends Controller
 
     public function getPackagesPerDate_byId($id)
     {
-        // SELECT id, barcode FROM package WHERE delivered_on IS NULL AND created_at > '2018-05-29 13:02:44'
-        // $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND DATE(created_at) = '" . $provided_date . "'";
+        // Use timezone-aware date filtering with buffer to handle timezone differences
+        $cut_off_days = env('NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES', 30);
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
         IF(pk.status = 0, 'AWAITING_PICKUP', 
@@ -645,7 +649,11 @@ class restrackController extends Controller
         IF(pk.status = 3,'RECEIVED', 
         IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
-        LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND pk.id > '" . $id . "'";
+        LEFT JOIN facility fa ON pk.facilityid = fa.id 
+        WHERE pk.delivered_on IS NULL 
+        AND pk.id > '" . $id . "'
+        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL " . $cut_off_days . " DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+        ORDER BY pk.id ASC";
 
         $db_data = \DB::select($query);
         $ret_arr = ['samples' => array_values($db_data)];
@@ -1433,6 +1441,15 @@ class restrackController extends Controller
                     'date_picked' => $post_data['date_picked'],
                     'created_by' => $post_data['user_id'],
                 ];
+                
+                // Set is_batch based on whether samples array or number_of_samples is provided
+                if (isset($post_data['samples']) && $post_data['samples'] != '') {
+                    $package_arr['numberofsamples'] = count($post_data['samples']);
+                    $package_arr['is_batch'] = 0;  // Single package with individual samples
+                } else {
+                    $package_arr['numberofsamples'] = $post_data['number_of_samples'];
+                    $package_arr['is_batch'] = 1;  // Batch package
+                }
                 /* initial status should depend on type of user - poe, 0 (waiting pickup) otherwise 1 (in transit)
                 */
                 if (isPoeOrEocUser($post_data['user_id'])) {

@@ -21,6 +21,8 @@ services:
       DB_DATABASE: hub_db
       DB_USERNAME: root
       DB_PASSWORD: root
+      NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES: 30
+      NUMBER_OF_DAYS_CUT_OFF_FOR_PACKAGES_OFF_LINE_MODE: 30
 
   db:
     image: mysql:8.0
