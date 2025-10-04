@@ -12,3 +12,4 @@ phpMyAdmin is at: http://localhost:8080
 ---- run tinker to the tables
 (new CreateFormsTable)->up();
 (new CreateFormFieldsTable)->up();
+# done
