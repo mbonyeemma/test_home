@@ -31,8 +31,7 @@ class Facility extends Model {
 	  'created',
 	  'distancefromhub',
 	  'createdby',
-	  'type',
-	  'facility_type'
+	  'type'
 	];
 
 	//public $timestamps = false;
