@@ -38,12 +38,21 @@
         </tr>
         <tr>
           <td>Facility Type</td>
-          <td>{{ $facility->facility_type }}</td>
+          <td>{{ $facility->type }}</td>
         </tr>
         @role(['administrator','national_hub_coordinator']) 
         <tr>
-        	<td></td>
-            <td> <a href="{{route('facility.printqr', $facility->id)}}" target="_blank">Print code</a>{!! QrCode::generate($facility->name)!!}</td>
+        	<td>QR Code</td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <a href="{{route('facility.printqr', $facility->id)}}" target="_blank" class="btn btn-primary btn-sm">
+                        <i class="fa fa-print"></i> Print QR Code
+                    </a>
+                    <div style="border: 2px solid #ddd; padding: 10px; border-radius: 8px; background-color: #f9f9f9;">
+                        {!! QrCode::size(150)->generate((string)$facility->id)!!}
+                    </div>
+                </div>
+            </td>
         </tr>
         @endrole
       </tbody>

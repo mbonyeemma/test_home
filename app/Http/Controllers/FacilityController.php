@@ -82,7 +82,7 @@ class FacilityController extends Controller {
 			$facility->labmanager = $request->labmanager;
 			$facility->address = $request->address;
 			$facility->email = $request->email;
-			$facility->facility_type = $request->facility_type;
+			$facility->type = $request->facility_type;
 			$facility->save();
 			return redirect()->route('facility.show', array('id' => $facility->id));
 
@@ -141,7 +141,7 @@ class FacilityController extends Controller {
 			$facility->incharge = $request->incharge;
 			$facility->labmanagerphonenumber = $request->labmanagerphonenumber;
 			$facility->labmanager = $request->labmanager;
-			$facility->facility_type = $request->facility_type;
+			$facility->type = $request->facility_type;
 			$facility->save();
 			return redirect()->route('facility.show', array('id' => $facility->id));
 
@@ -169,7 +169,11 @@ class FacilityController extends Controller {
     }
 	
 	public function printQr($id){
-		$facility = Facility::findOrFail($id);
-		return view ('facility.print', compact('facility'));
+		try {
+			$facility = Facility::findOrFail($id);
+			return view ('facility.print', compact('facility'));
+		} catch (\Exception $e) {
+			return redirect()->back()->with('error', 'Facility not found or QR code generation failed.');
+		}
 	}
 }
