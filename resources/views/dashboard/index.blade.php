@@ -8,7 +8,6 @@
 <script src="{{ asset('js/jquery-jvectormap-world-mill-en.js') }}"></script> 
 <script src="{{ asset('js/jquery.slimscroll.min.js') }}"></script> 
 <script src="{{ asset('js/Chart.js') }}"></script> 
-<script src="{{ asset('js/jquery.slimscroll.min.js') }}"></script> 
 <script src="{{ asset('js/jquery.stickytabs.js') }}"></script> 
 <script>
 	$(document).ready(function() {
