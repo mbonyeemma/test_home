@@ -22,6 +22,7 @@
                 <tr>
                     <th>Name</th>
                     <th>Email</th>
+                    <th>Phone</th>
                     <th>Date/Time Added</th>
                     <th>User Roles</th>
                     <th>Action</th>
@@ -34,6 +35,7 @@
 
                     <td><a href="{{ route('users.show', $user->id ) }}">{{ $user->name }}</a></td>
                     <td>{{ $user->email }}</td>
+                    <td>{{ $user->username }}</td>
                     <td>{{ $user->created_at->format('F d, Y') }}</td>
                     <td>{{ $user->roles()->pluck('display_name')->implode(', ') }}</td>{{-- Retrieve array of roles associated to a user and convert to string --}}
                     <td>

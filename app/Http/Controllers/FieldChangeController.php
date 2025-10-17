@@ -11,7 +11,7 @@ class FieldChangeController extends Controller
 {
     public function index()
     {
-        $pendingChanges = FieldChange::with('form', 'maker')
+        $pendingChanges = FieldChange::with('form', 'maker', 'field')
             ->where('approval_status', 'pending')
             // ->where('maker_id', '!=', auth()->id()) // prevent viewing own
             ->get();

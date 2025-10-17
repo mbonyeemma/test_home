@@ -261,7 +261,11 @@ class FormController extends Controller
     public function destroy($form_id)
     {
         $form = Forms::where('form_id', $form_id)->firstOrFail();
-        $form->delete();
+        \DB::transaction(function () use ($form) {
+            FieldChange::where('form_id', $form->id)->delete();
+            $form->fields()->delete();
+            $form->delete();
+        });
 
         return redirect()->route('forms.create')->with('success', 'Form deleted successfully.');
     }

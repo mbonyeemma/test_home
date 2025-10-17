@@ -38,7 +38,6 @@
 	.selectdropdown {
 		width: 200px;
 		border-radius: 3px;
-		border-radius: 25px:
 	}
 
 	.label-bs {
