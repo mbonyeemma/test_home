@@ -72,6 +72,10 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack_new/pending_registrations/', 'MobileAppRegistrationController@getPendingRegistrations');
 	Route::post('/restrack_new/approve_user/{id}', 'MobileAppRegistrationController@approveUser');
 	
+	Route::post('/restrack_new/forgot-password/send-otp', 'ForgotPasswordController@sendOTP');
+	Route::post('/restrack_new/forgot-password/verify-otp', 'ForgotPasswordController@verifyOTP');
+	Route::post('/restrack_new/forgot-password/reset', 'ForgotPasswordController@resetPassword');
+	
 	Route::post('/restrack_new/login/', 'restrackController@login');
 	Route::post('/restrack_new/send_package_invitation/', 'restrackController@sendPackageInvitation');
 	Route::post('/restrack_new/save_prepared_packages/', 'restrackController@savePreparedPackages');
