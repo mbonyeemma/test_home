@@ -1910,9 +1910,9 @@ class restrackController extends Controller
                     // Convert to integer to ensure it's numeric
                     $facilityid = (int) $facilityid;
                     
-                    // Get the hubid from the facility
+                    // Get the hubid from the facility using parentid
                     $facility = \DB::table('facility')->where('id', $facilityid)->first();
-                    $hubid = $facility ? $facility->hubid : 1; // Default to 1 if facility not found
+                    $hubid = $facility ? ($facility->parentid ?: $facility->id) : 1; // Use parentid, or facility's own id if it's a hub, or default to 1
                     
                     \Log::info("Saving prepared package. Barcode: {$packageData['barcode']}, FacilityID: {$facilityid}, HubID: {$hubid}");
                     
