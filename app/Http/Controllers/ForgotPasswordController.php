@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\User;
 use App\Services\SmsService;
+use App\Mail\PasswordResetEmail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -53,13 +55,29 @@ class ForgotPasswordController extends Controller
 
             $smsSent = $this->smsService->sendOTP($phoneNumber, $otp);
 
+            if ($user->email) {
+                try {
+                    Mail::to($user->email)->send(new PasswordResetEmail($user, $otp));
+                    \Log::info('Password reset email sent to: ' . $user->email);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to send password reset email: ' . $e->getMessage());
+                }
+            }
+
             if ($smsSent) {
                 return response()->json([
                     'status' => 200,
-                    'message' => 'OTP sent successfully to your phone',
+                    'message' => 'OTP sent successfully to your phone' . ($user->email ? ' and email' : ''),
                     'reset_token' => $resetToken
                 ]);
             } else {
+                if ($user->email) {
+                    return response()->json([
+                        'status' => 200,
+                        'message' => 'OTP sent successfully to your email',
+                        'reset_token' => $resetToken
+                    ]);
+                }
                 return response()->json([
                     'status' => 500,
                     'message' => 'Failed to send OTP. Please try again.'
