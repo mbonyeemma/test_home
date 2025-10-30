@@ -20,3 +20,9 @@ restore_db.sql
 ROLE_SWITCHING_CORRECTED_README.md
 *_README.md
 *_CORRECTED_README.md
+
+# Documentation and instruction files
+*.txt
+!HUB_COORDINATOR_ACCESS_METHOD.txt
+!COMMIT_MESSAGE.txt
+!READY_TO_PUSH.txt

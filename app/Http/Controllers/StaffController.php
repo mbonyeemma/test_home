@@ -14,8 +14,10 @@ use \App\Models\User as User;
 use \App\Models\Equipment as Equipment;
 use App\Models\Role;
 use App\SelfRegApproval;
+use App\Mail\AccountApproval;
 use DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class StaffController extends Controller
 {
@@ -182,16 +184,19 @@ class StaffController extends Controller
 			$user->roles()->attach($role->id); // ✅ attach the actual ID
 		}
 
-        // Update self_reg as active
         DB::update("UPDATE restrackself_reg SET isactive = 1 WHERE id = ?", [$id]);
 
-        // Send notification using NotificationService
         try {
+            if ($user->email) {
+                Mail::to($user->email)->send(new AccountApproval($user, true));
+                \Log::info('Account approval email sent to: ' . $user->email);
+            }
+
             $notifier = new \App\Services\NotificationService();
             $notifier->sendNotification(
                 $selfReg->username,
-                'Hello, your account has been approved.',
-                'EMAIL', // Email notification only
+                'Your account has been approved. You can now log in to the RESTRACK system.',
+                'APP',
                 'ACCOUNT_APPROVAL'
             );
         } catch (\Exception $notifyEx) {
@@ -216,13 +221,27 @@ class StaffController extends Controller
         'reason' => 'required|string|max:1000',
     ]);
 
-    // Update record
+    $selfReg = DB::selectOne("SELECT * FROM restrackself_reg WHERE id = ?", [$request->id]);
+
     \DB::table('restrackself_reg')
         ->where('id', $request->id)
         ->update([
             'isactive' => 2,
             'rejection_reason' => $request->reason,
         ]);
+
+    try {
+        if ($selfReg && $selfReg->email) {
+            $user = (object)[
+                'name' => $selfReg->name,
+                'email' => $selfReg->email,
+            ];
+            Mail::to($selfReg->email)->send(new AccountApproval($user, false, $request->reason));
+            \Log::info('Account rejection email sent to: ' . $selfReg->email);
+        }
+    } catch (\Exception $e) {
+        \Log::error('Failed to send rejection email: ' . $e->getMessage());
+    }
 
     return redirect()->back()->with('success', 'User rejected with reason.');
 }

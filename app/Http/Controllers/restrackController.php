@@ -70,6 +70,52 @@ class restrackController extends Controller
         }
     }
 
+    public function saveFcmToken(Request $request)
+    {
+        try {
+            $request->validate([
+                'username' => 'required|string',
+                'fcm_token' => 'required|string',
+            ]);
+
+            $user = User::where('username', $request->username)
+                ->orWhere('email', $request->username)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $user->fcm_token = $request->fcm_token;
+            $user->save();
+
+            Log::info('FCM token saved for user', [
+                'user_id' => $user->id,
+                'username' => $user->username,
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'FCM token saved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to save FCM token', [
+                'error' => $e->getMessage(),
+                'username' => $request->username ?? 'unknown',
+            ]);
+
+            return response()->json([
+                'status' => 500,
+                'message' => 'Failed to save FCM token',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function packagesPerHub(Request $request)
     {
 
