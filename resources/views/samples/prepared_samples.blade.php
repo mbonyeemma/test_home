@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Prepared Samples - Awaiting Pickup')
+@section('title', 'Samples Awaiting Pickup')
 
 @section('css')
 <link rel="stylesheet" href="{{ asset('css/jquery.dataTables.min.css') }}">
@@ -25,8 +25,6 @@
         border-radius: 4px;
         font-size: 11px;
         font-weight: bold;
-    }
-    .status-waiting {
         background-color: #fff3cd;
         color: #856404;
     }
@@ -60,15 +58,18 @@ $(document).ready(function() {
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             },
             success: function(response) {
+                button.text('✓ Request Sent!').css('background-color', '#27ae60');
+                
                 alert('Pickup request sent successfully!\n\n' +
                       'Riders notified: ' + response.summary.total_riders + '\n' +
                       'Emails sent: ' + response.summary.emails_sent + '\n' +
                       'SMS sent: ' + response.summary.sms_sent + '\n' +
                       'App notifications: ' + response.summary.app_notifications);
                 
-                button.text('✓ Request Sent').css('background-color', '#27ae60');
                 setTimeout(function() {
-                    button.prop('disabled', false).text('Request Rider').css('background-color', '');
+                    button.prop('disabled', false)
+                          .text('🏍️ Request Rider')
+                          .css('background-color', '');
                 }, 3000);
             },
             error: function(xhr) {
@@ -103,7 +104,7 @@ $(document).ready(function() {
 <section class="content">
     <div class="box box-primary">
         <div class="box-header with-border">
-            <h3 class="box-title">Prepared Samples Awaiting Pickup</h3>
+            <h3 class="box-title">Samples Awaiting Pickup</h3>
             <div class="box-tools pull-right">
                 <button type="button" class="btn btn-box-tool" data-widget="collapse">
                     <i class="fa fa-minus"></i>
@@ -147,8 +148,8 @@ $(document).ready(function() {
                                 <td>{{ $sample->test_type_name ?? 'N/A' }}</td>
                                 <td>{{ $sample->numberofsamples }}</td>
                                 <td>
-                                    <span class="status-badge status-waiting">
-                                        {{ $sample->status_text }}
+                                    <span class="status-badge">
+                                        Awaiting Pickup
                                     </span>
                                 </td>
                                 <td>{{ date('Y-m-d H:i', strtotime($sample->created_at)) }}</td>

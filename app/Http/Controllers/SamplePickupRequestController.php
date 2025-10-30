@@ -35,17 +35,12 @@ class SamplePickupRequestController extends Controller
                   p.created_at, p.date_picked, p.test_type,
                   f.name as facility_name, 
                   h.name as hub_name,
-                  tt.name as test_type_name,
-                  CASE 
-                    WHEN p.status = 1 THEN 'Waiting for Pickup'
-                    WHEN p.status = 2 THEN 'Delivered'
-                    ELSE 'Unknown'
-                  END as status_text
+                  tt.name as test_type_name
                   FROM package p
                   INNER JOIN facility f ON p.facilityid = f.id
                   INNER JOIN facility h ON p.hubid = h.id
                   LEFT JOIN testtypes tt ON p.test_type = tt.id
-                  WHERE p.hubid = ? AND p.status = 1
+                  WHERE p.hubid = ? AND p.status = 0
                   ORDER BY p.created_at DESC";
 
         $preparedSamples = DB::select($query, [$hubId]);
