@@ -436,7 +436,10 @@ class StaffController extends Controller
 			$staff->nationalid = $request->nationalid;
 
 			$user = User::where('staff_id', '=', $staff->id)->first();
-			$user->hubid = $request->facilityid;
+			
+			if ($user) {
+				$user->hubid = $request->facilityid;
+			}
 
 			if ($staff->type == 1) {
 				$staff->hasdrivingpermit = $request->hasdrivingpermit;
@@ -447,7 +450,10 @@ class StaffController extends Controller
 			} else {
 				$staff->designation = $request->designation;
 			}
-			$user->save();
+			
+			if ($user) {
+				$user->save();
+			}
 			$staff->save();
 			return redirect()->route('staff.show', array('id' => $staff->id));
 		} catch (\Exception $e) {
