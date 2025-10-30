@@ -1,0 +1,208 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              🐳 DOCKER MIGRATION COMMANDS FOR PRODUCTION                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  OPTION 1: If using docker-compose                                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+# SSH to your production server first
+ssh user@54.243.89.55
+
+# Navigate to project directory
+cd /path/to/test_home
+
+# Pull latest code
+git pull origin prod
+
+# Install composer dependencies INSIDE Docker container
+docker-compose exec app composer install --no-dev --optimize-autoloader --ignore-platform-reqs
+
+# Run migrations INSIDE Docker container
+docker-compose exec app php artisan migrate
+
+# Clear caches
+docker-compose exec app php artisan config:clear
+docker-compose exec app php artisan route:cache
+docker-compose exec app php artisan view:clear
+
+# Set permissions for Firebase JSON (if needed)
+docker-compose exec app chmod 600 storage/app/firebase-service-account.json
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  OPTION 2: If container has different name                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+# First, find your PHP/Laravel container name
+docker ps
+
+# Look for the container running your Laravel app, then use its name:
+# Common names: test_home_app, php, laravel, app, web
+
+# Run migration with specific container name (replace CONTAINER_NAME)
+docker exec -it CONTAINER_NAME php artisan migrate
+
+# Example if container is named "test_home_app_1":
+docker exec -it test_home_app_1 php artisan migrate
+
+# Example if container is named "php":
+docker exec -it php php artisan migrate
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  OPTION 3: Complete deployment with docker-compose                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+#!/bin/bash
+# Complete deployment script
+
+cd /path/to/test_home
+
+# Pull latest code
+git pull origin prod
+
+# Rebuild containers (if Dockerfile changed)
+docker-compose build app
+
+# Install dependencies
+docker-compose exec app composer install --no-dev --optimize-autoloader --ignore-platform-reqs
+
+# Run ALL pending migrations
+docker-compose exec app php artisan migrate --force
+
+# If you want to see migration status first
+docker-compose exec app php artisan migrate:status
+
+# Clear all caches
+docker-compose exec app php artisan config:clear
+docker-compose exec app php artisan route:cache
+docker-compose exec app php artisan view:clear
+docker-compose exec app php artisan cache:clear
+
+# Restart containers (if needed)
+docker-compose restart app
+
+# OR stop and start
+docker-compose down
+docker-compose up -d
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  OPTION 4: Interactive shell inside Docker container                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+# Enter the container
+docker-compose exec app bash
+
+# OR
+docker exec -it CONTAINER_NAME bash
+
+# Once inside, run normal artisan commands:
+composer install --no-dev --optimize-autoloader
+php artisan migrate
+php artisan migrate:status
+php artisan config:clear
+php artisan route:cache
+exit
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  VERIFY MIGRATIONS COMPLETED                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+# Check migration status
+docker-compose exec app php artisan migrate:status
+
+# Should show these as "Ran":
+# ✓ 2025_10_27_000001_create_notifications_table
+# ✓ 2025_10_28_000001_create_package_pickup_requests_table
+# ✓ 2025_10_30_000001_add_fcm_token_to_users_table
+
+# Verify in database
+docker-compose exec app php artisan tinker
+>>> \DB::select("SHOW COLUMNS FROM users LIKE 'fcm_token'");
+>>> exit
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  TROUBLESHOOTING                                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Problem: "docker-compose: command not found"
+Solution: Use "docker compose" (no hyphen) - newer Docker versions
+         docker compose exec app php artisan migrate
+
+Problem: "Container is not running"
+Solution: Start containers first
+         docker-compose up -d
+         Then run migration commands
+
+Problem: "No such service: app"
+Solution: Check your service name in docker-compose.yml
+         It might be called: php, web, laravel, backend
+         docker-compose exec SERVICE_NAME php artisan migrate
+
+Problem: "Permission denied"
+Solution: Run with sudo or check user permissions
+         sudo docker-compose exec app php artisan migrate
+
+Problem: "Migration table not found"
+Solution: Run migration:install first
+         docker-compose exec app php artisan migrate:install
+         docker-compose exec app php artisan migrate
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  UPLOAD FIREBASE SERVICE ACCOUNT JSON                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+# Option 1: SCP to server
+scp storage/app/firebase-service-account.json user@54.243.89.55:/path/to/test_home/storage/app/
+
+# Option 2: Copy into Docker container volume
+# First, copy to server
+scp storage/app/firebase-service-account.json user@54.243.89.55:/tmp/
+
+# Then copy from server to container volume
+ssh user@54.243.89.55
+docker cp /tmp/firebase-service-account.json CONTAINER_NAME:/var/www/html/storage/app/
+
+# Option 3: If using bind mount (volume)
+# Just copy to the mounted directory on host
+scp storage/app/firebase-service-account.json user@54.243.89.55:/path/to/test_home/storage/app/
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  RECOMMENDED: One-Command Deployment                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+# Run this single command on your server:
+cd /path/to/test_home && \
+git pull origin prod && \
+docker-compose exec app composer install --no-dev --optimize-autoloader --ignore-platform-reqs && \
+docker-compose exec app php artisan migrate --force && \
+docker-compose exec app php artisan config:clear && \
+docker-compose exec app php artisan route:cache && \
+echo "✅ Deployment complete!"
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              QUICK START                                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+MOST COMMON COMMAND:
+────────────────────
+docker-compose exec app php artisan migrate --force
+
+This runs migrations inside your Docker container without prompting.
+
+If that doesn't work, find your container name first:
+────────────────────────────────────────────────────────
+docker ps
+# Then use: docker exec -it YOUR_CONTAINER_NAME php artisan migrate
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         ✅ READY TO RUN!                                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
