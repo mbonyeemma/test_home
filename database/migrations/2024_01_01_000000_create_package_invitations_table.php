@@ -14,7 +14,7 @@ class CreatePackageInvitationsTable extends Migration
     public function up()
     {
         Schema::create('package_invitations', function (Blueprint $table) {
-            $table->id();
+            $table->increments('id');
             $table->string('package_id');
             $table->string('barcode');
             $table->string('package_name');
