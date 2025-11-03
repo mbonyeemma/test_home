@@ -1880,6 +1880,10 @@ class restrackController extends Controller
                 ], 400);
             }
 
+            $userId = $post_data['userId'] ?? $post_data['staffId'] ?? 1;
+            $user = \DB::table('users')->where('id', $userId)->first();
+            $userHubId = $user ? $user->hubid : null;
+
             $savedPackages = [];
             $samples = [];
             $errors = [];
@@ -1910,10 +1914,9 @@ class restrackController extends Controller
                     
                     $facilityid = (int) $facilityid;
                     
-                    $facility = \DB::table('facility')->where('id', $facilityid)->first();
-                    $hubid = $facility ? ($facility->parentid ?: $facility->id) : 1;
+                    $hubid = $userHubId ?: 1;
                     
-                    \Log::info("Saving prepared package. Barcode: {$packageData['barcode']}, FacilityID: {$facilityid}, HubID: {$hubid}");
+                    \Log::info("Saving prepared package. Barcode: {$packageData['barcode']}, FacilityID: {$facilityid}, HubID: {$hubid}, UserID: {$userId}");
                     
                     $packageId = \DB::table('package')->insertGetId([
                         'barcode' => $packageData['barcode'],
