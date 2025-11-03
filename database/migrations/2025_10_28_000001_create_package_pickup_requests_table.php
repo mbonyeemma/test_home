@@ -8,8 +8,9 @@ class CreatePackagePickupRequestsTable extends Migration
 {
     public function up()
     {
-        Schema::create('package_pickup_requests', function (Blueprint $table) {
-            $table->increments('id');
+        if (!Schema::hasTable('package_pickup_requests')) {
+            Schema::create('package_pickup_requests', function (Blueprint $table) {
+                $table->increments('id');
             $table->integer('package_id')->unsigned();
             $table->integer('requested_by')->unsigned();
             $table->integer('hub_id')->unsigned();
@@ -22,7 +23,8 @@ class CreatePackagePickupRequestsTable extends Migration
             $table->index('package_id');
             $table->index('hub_id');
             $table->index('requested_by');
-        });
+            });
+        }
     }
 
     public function down()

@@ -13,13 +13,29 @@ class AddMakerCheckerToFormsTable extends Migration
      */
     public function up()
     {
-       Schema::table('forms', function (Blueprint $table) {
-        $table->unsignedInteger('submitted_by')->nullable()->after('publish_status');
-        $table->unsignedInteger('approved_by')->nullable()->after('submitted_by');
+        Schema::table('forms', function (Blueprint $table) {
+            if (!Schema::hasColumn('forms', 'submitted_by')) {
+                $table->unsignedInteger('submitted_by')->nullable()->after('publish_status');
+            }
+            if (!Schema::hasColumn('forms', 'approved_by')) {
+                $table->unsignedInteger('approved_by')->nullable()->after('submitted_by');
+            }
+        });
 
-        $table->foreign('submitted_by')->references('id')->on('users')->nullOnDelete();
-        $table->foreign('approved_by')->references('id')->on('users')->nullOnDelete();
-    });
+        $sm = Schema::getConnection()->getDoctrineSchemaManager();
+        $indexesFound = $sm->listTableIndexes('forms');
+        
+        if (!isset($indexesFound['forms_submitted_by_foreign'])) {
+            Schema::table('forms', function (Blueprint $table) {
+                $table->foreign('submitted_by')->references('id')->on('users')->onDelete('set null');
+            });
+        }
+        
+        if (!isset($indexesFound['forms_approved_by_foreign'])) {
+            Schema::table('forms', function (Blueprint $table) {
+                $table->foreign('approved_by')->references('id')->on('users')->onDelete('set null');
+            });
+        }
     }
 
     /**
