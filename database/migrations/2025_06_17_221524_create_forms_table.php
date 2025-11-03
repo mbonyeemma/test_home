@@ -13,12 +13,14 @@ class CreateFormsTable extends Migration
      */
     public function up()
     {
-       Schema::create('forms', function (Blueprint $table) {
-        $table->increments('id');
-        $table->string('name');
-        $table->string('form_id')->unique(); // Used as external reference
-        $table->timestamps();
-    });
+        if (!Schema::hasTable('forms')) {
+            Schema::create('forms', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('name');
+                $table->string('form_id')->unique();
+                $table->timestamps();
+            });
+        }
     }
 
     /**
