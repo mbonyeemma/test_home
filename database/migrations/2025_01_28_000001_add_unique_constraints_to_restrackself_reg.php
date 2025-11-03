@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
@@ -13,10 +14,11 @@ class AddUniqueConstraintsToRestrackselfReg extends Migration
      */
     public function up()
     {
-        $sm = Schema::getConnection()->getDoctrineSchemaManager();
-        $indexesFound = $sm->listTableIndexes('restrackself_reg');
+        $usernameIndexExists = DB::select("
+            SHOW INDEX FROM restrackself_reg WHERE Key_name = 'restrackself_reg_username_unique'
+        ");
         
-        if (!isset($indexesFound['restrackself_reg_username_unique'])) {
+        if (empty($usernameIndexExists)) {
             $duplicates = DB::select("
                 SELECT username, COUNT(*) as count 
                 FROM restrackself_reg 
@@ -33,7 +35,11 @@ class AddUniqueConstraintsToRestrackselfReg extends Migration
             }
         }
         
-        if (!isset($indexesFound['restrackself_reg_email_unique'])) {
+        $emailIndexExists = DB::select("
+            SHOW INDEX FROM restrackself_reg WHERE Key_name = 'restrackself_reg_email_unique'
+        ");
+        
+        if (empty($emailIndexExists)) {
             $duplicates = DB::select("
                 SELECT email, COUNT(*) as count 
                 FROM restrackself_reg 

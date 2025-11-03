@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
@@ -13,10 +14,11 @@ class AddUniqueUsernameToUsers extends Migration
      */
     public function up()
     {
-        $sm = Schema::getConnection()->getDoctrineSchemaManager();
-        $indexesFound = $sm->listTableIndexes('users');
+        $indexExists = DB::select("
+            SHOW INDEX FROM users WHERE Key_name = 'users_username_unique'
+        ");
         
-        if (!isset($indexesFound['users_username_unique'])) {
+        if (empty($indexExists)) {
             $duplicates = DB::select("
                 SELECT username, COUNT(*) as count 
                 FROM users 
