@@ -13,8 +13,9 @@ class CreatePackageInvitationsTable extends Migration
      */
     public function up()
     {
-        Schema::create('package_invitations', function (Blueprint $table) {
-            $table->increments('id');
+        if (!Schema::hasTable('package_invitations')) {
+            Schema::create('package_invitations', function (Blueprint $table) {
+                $table->increments('id');
             $table->string('package_id');
             $table->string('barcode');
             $table->string('package_name');
@@ -29,7 +30,8 @@ class CreatePackageInvitationsTable extends Migration
             
             $table->index(['barcode', 'invited_email']);
             $table->index('status');
-        });
+            });
+        }
     }
 
     /**

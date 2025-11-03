@@ -13,9 +13,11 @@ class AddColorToFormsTable extends Migration
      */
     public function up()
     {
-        Schema::table('forms', function (Blueprint $table) {
-            $table->string('color', 7)->default('#3498db')->after('form_submission_url');
-        });
+        if (!Schema::hasColumn('forms', 'color')) {
+            Schema::table('forms', function (Blueprint $table) {
+                $table->string('color', 7)->default('#3498db')->after('form_submission_url');
+            });
+        }
     }
 
     /**
