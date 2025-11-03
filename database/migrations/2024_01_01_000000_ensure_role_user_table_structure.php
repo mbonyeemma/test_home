@@ -13,32 +13,34 @@ class EnsureRoleUserTableStructure extends Migration
      */
     public function up()
     {
-        // Check if role_user table exists, if not create it
+        if (!Schema::hasTable('users') || !Schema::hasTable('roles')) {
+            return;
+        }
+
         if (!Schema::hasTable('role_user')) {
-            Schema::create('role_user', function (Blueprint $table) {
-                $table->unsignedInteger('user_id');
-                $table->unsignedInteger('role_id');
-                $table->timestamps();
-                
-                $table->primary(['user_id', 'role_id']);
-                $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-                $table->foreign('role_id')->references('id')->on('roles')->onDelete('cascade');
-            });
-        } else {
-            // If table exists, ensure it has the correct structure
-            Schema::table('role_user', function (Blueprint $table) {
-                // Add timestamps if they don't exist
-                if (!Schema::hasColumn('role_user', 'created_at')) {
+            try {
+                Schema::create('role_user', function (Blueprint $table) {
+                    $table->unsignedInteger('user_id');
+                    $table->unsignedInteger('role_id');
                     $table->timestamps();
-                }
-                
-                // Ensure primary key constraint exists
-                if (!Schema::hasColumn('role_user', 'id')) {
-                    // Drop existing primary key if it's not composite
-                    $table->dropPrimary();
+                    
                     $table->primary(['user_id', 'role_id']);
-                }
-            });
+                    $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+                    $table->foreign('role_id')->references('id')->on('roles')->onDelete('cascade');
+                });
+            } catch (\Exception $e) {
+                echo "Warning: Could not create role_user table - " . $e->getMessage() . "\n";
+            }
+        } else {
+            try {
+                Schema::table('role_user', function (Blueprint $table) {
+                    if (!Schema::hasColumn('role_user', 'created_at')) {
+                        $table->timestamps();
+                    }
+                });
+            } catch (\Exception $e) {
+                echo "Warning: Could not update role_user table - " . $e->getMessage() . "\n";
+            }
         }
     }
 
