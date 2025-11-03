@@ -80,7 +80,7 @@ Route::group(['middleware' => 'auth'], function () {
 	));
 	Route::resource('users', 'UserController');
 	
-	Route::resource('samplereceiption', 'SampleReceiptionController');
+	Route::resource('samplereceiption', 'SampleReceptionController');
 	Route::get('message/list/{type}', 'MessageController@index')->name('messages');
 	Route::resource('message', 'MessageController');
 	Route::resource('roles', 'RoleController');

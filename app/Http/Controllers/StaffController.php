@@ -438,7 +438,7 @@ class StaffController extends Controller
 			$user = User::where('staff_id', '=', $staff->id)->first();
 			
 			if ($user) {
-				$user->hubid = $request->facilityid;
+			$user->hubid = $request->facilityid;
 			}
 
 			if ($staff->type == 1) {
@@ -452,7 +452,7 @@ class StaffController extends Controller
 			}
 			
 			if ($user) {
-				$user->save();
+			$user->save();
 			}
 			$staff->save();
 			return redirect()->route('staff.show', array('id' => $staff->id));
