@@ -287,6 +287,15 @@ class SamplePickupRequestController extends Controller
     public function requestRiderApi(Request $request, $packageId)
     {
         try {
+            $userId = $request->header('X-User-Id') ?? 1;
+            $userHubId = $request->header('X-Hub-Id');
+            
+            Log::info('Rider request initiated via API', [
+                'package_id' => $packageId,
+                'user_id' => $userId,
+                'hub_id' => $userHubId
+            ]);
+
             $package = DB::table('package')
                 ->leftJoin('facility as f', 'package.facilityid', '=', 'f.id')
                 ->leftJoin('facility as h', 'package.hubid', '=', 'h.id')
@@ -308,94 +317,150 @@ class SamplePickupRequestController extends Controller
             }
 
             $hubId = $package->hubid;
+            
+            if ($userHubId && $package->hubid != $userHubId) {
+                return response()->json([
+                    'status' => 403,
+                    'message' => 'Package does not belong to your hub'
+                ], 403);
+            }
 
-            $riders = DB::table('staff')
-                ->join('users', 'staff.user_id', '=', 'users.id')
-                ->where('staff.hubid', $hubId)
-                ->where('staff.designation', 1)
-                ->where('staff.isactive', 1)
+            $riders = DB::table('users')
+                ->join('role_user', 'users.id', '=', 'role_user.user_id')
+                ->join('roles', 'role_user.role_id', '=', 'roles.id')
+                ->leftJoin('staff', 'users.staff_id', '=', 'staff.id')
+                ->where('users.hubid', $hubId)
+                ->whereIn('roles.name', ['sample_transporter', 'special_sample_transportor', 'private_rider'])
+                ->where('users.isactive', 1)
                 ->select(
-                    'staff.id as staff_id',
-                    'staff.firstname',
-                    'staff.lastname',
-                    'staff.emailaddress',
-                    'staff.telephonenumber',
-                    'users.id as user_id',
-                    'users.username'
+                    'users.id',
+                    'users.name',
+                    'users.username',
+                    'users.email',
+                    DB::raw('COALESCE(staff.telephonenumber, 
+                             CASE 
+                                 WHEN users.username REGEXP "^[0-9+]" THEN users.username
+                                 ELSE NULL 
+                             END) as phone_number')
                 )
                 ->get();
 
             if ($riders->isEmpty()) {
                 return response()->json([
                     'status' => 404,
-                    'message' => 'No active riders found for this hub'
+                    'message' => 'No active riders found for your hub'
                 ], 404);
             }
 
-            $pickupRequest = DB::table('package_pickup_requests')->insertGetId([
-                'package_id' => $packageId,
-                'hub_id' => $hubId,
-                'requested_by' => 1,
-                'riders_notified' => 0,
-                'emails_sent' => 0,
-                'sms_sent' => 0,
-                'app_notifications_sent' => 0,
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
+            $packageData = [
+                'barcode' => $package->barcode,
+                'facility' => $package->facility_name,
+                'hub' => $package->hub_name,
+                'samples' => $package->numberofsamples,
+                'test_type' => $package->test_type_name ?? 'N/A',
+                'date_prepared' => date('Y-m-d H:i', strtotime($package->created_at)),
+            ];
 
             $emailsSent = 0;
             $smsSent = 0;
             $appNotifications = 0;
 
             foreach ($riders as $rider) {
-                if ($rider->emailaddress) {
+                if ($rider->email && filter_var($rider->email, FILTER_VALIDATE_EMAIL) && !str_contains($rider->email, '@dev.com')) {
                     try {
-                        $this->notificationService->sendNotification(
-                            $rider->username,
-                            "Pickup request for package {$package->barcode} at {$package->facility_name}. Contact hub for details.",
-                            'EMAIL',
-                            'PICKUP_REQUEST'
-                        );
+                        $riderUser = (object)[
+                            'name' => $rider->name,
+                            'email' => $rider->email,
+                        ];
+                        Mail::to($rider->email)->send(new RiderPickupRequest($riderUser, $packageData));
                         $emailsSent++;
+                        Log::info('Pickup request email sent to rider', [
+                            'rider_id' => $rider->id,
+                            'email' => $rider->email,
+                            'package_id' => $packageId
+                        ]);
                     } catch (\Exception $e) {
-                        Log::error("Failed to send email to rider {$rider->staff_id}: " . $e->getMessage());
+                        Log::error("Failed to send email to rider {$rider->id}: " . $e->getMessage());
                     }
                 }
 
-                if ($rider->telephonenumber) {
+                if ($rider->phone_number) {
                     try {
-                        $this->smsService->sendSMS(
-                            $rider->telephonenumber,
-                            "RESTRACK: Pickup needed for package {$package->barcode} at {$package->facility_name}"
-                        );
+                        $smsMessage = "RESTRACK: New sample pickup request!\n\n";
+                        $smsMessage .= "Package: {$packageData['barcode']}\n";
+                        $smsMessage .= "Facility: {$packageData['facility']}\n";
+                        $smsMessage .= "Samples: {$packageData['samples']}\n";
+                        $smsMessage .= "Test: {$packageData['test_type']}\n\n";
+                        $smsMessage .= "Please pick up this package at your earliest convenience.";
+
+                        $this->smsService->sendSMS($rider->phone_number, $smsMessage);
                         $smsSent++;
+                        Log::info('Pickup request SMS sent to rider', [
+                            'rider_id' => $rider->id,
+                            'phone' => $rider->phone_number,
+                            'package_id' => $packageId
+                        ]);
                     } catch (\Exception $e) {
-                        Log::error("Failed to send SMS to rider {$rider->staff_id}: " . $e->getMessage());
+                        Log::error('Failed to send SMS to rider', [
+                            'rider_id' => $rider->id,
+                            'error' => $e->getMessage()
+                        ]);
                     }
                 }
 
                 try {
                     $this->notificationService->sendNotification(
                         $rider->username,
-                        "Pickup request for package {$package->barcode} at {$package->facility_name}",
+                        "New sample pickup request! Package {$packageData['barcode']} from {$packageData['facility']} is ready for pickup. {$packageData['samples']} samples.",
                         'APP',
                         'PICKUP_REQUEST'
                     );
                     $appNotifications++;
                 } catch (\Exception $e) {
-                    Log::error("Failed to send app notification to rider {$rider->staff_id}: " . $e->getMessage());
+                    Log::error('Failed to send app notification to rider', [
+                        'rider_id' => $rider->id,
+                        'error' => $e->getMessage()
+                    ]);
                 }
             }
 
-            DB::table('package_pickup_requests')
-                ->where('id', $pickupRequest)
-                ->update([
-                    'riders_notified' => $riders->count(),
-                    'emails_sent' => $emailsSent,
-                    'sms_sent' => $smsSent,
-                    'app_notifications_sent' => $appNotifications
+            try {
+                $existingRequest = DB::table('package_pickup_requests')
+                    ->where('package_id', $packageId)
+                    ->where('created_at', '>', now()->subHours(24))
+                    ->first();
+                
+                if ($existingRequest) {
+                    DB::table('package_pickup_requests')
+                        ->where('id', $existingRequest->id)
+                        ->update([
+                            'riders_notified' => $riders->count(),
+                            'emails_sent' => $emailsSent,
+                            'sms_sent' => $smsSent,
+                            'app_notifications_sent' => $appNotifications,
+                            'updated_at' => now(),
+                        ]);
+                    Log::info('Updated existing pickup request', ['package_id' => $packageId]);
+                } else {
+                    DB::table('package_pickup_requests')->insert([
+                        'package_id' => $packageId,
+                        'requested_by' => $userId,
+                        'hub_id' => $hubId,
+                        'riders_notified' => $riders->count(),
+                        'emails_sent' => $emailsSent,
+                        'sms_sent' => $smsSent,
+                        'app_notifications_sent' => $appNotifications,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    Log::info('Created new pickup request', ['package_id' => $packageId]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to save pickup request to database', [
+                    'package_id' => $packageId,
+                    'error' => $e->getMessage()
                 ]);
+            }
 
             return response()->json([
                 'status' => 200,
@@ -404,17 +469,17 @@ class SamplePickupRequestController extends Controller
                     'total_riders' => $riders->count(),
                     'emails_sent' => $emailsSent,
                     'sms_sent' => $smsSent,
-                    'app_notifications' => $appNotifications
-                ],
-                'package' => [
-                    'id' => $package->id,
-                    'barcode' => $package->barcode,
-                    'facility' => $package->facility_name
+                    'app_notifications' => $appNotifications,
                 ]
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error in requestRiderApi: ' . $e->getMessage());
+            Log::error('Error sending pickup request', [
+                'package_id' => $packageId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'status' => 500,
                 'message' => 'Error sending pickup request: ' . $e->getMessage()
