@@ -8,8 +8,9 @@ class CreateNotificationsTable extends Migration
 {
     public function up()
     {
-        Schema::create('notifications', function (Blueprint $table) {
-            $table->increments('id');
+        if (!Schema::hasTable('notifications')) {
+            Schema::create('notifications', function (Blueprint $table) {
+                $table->increments('id');
             $table->integer('user_id')->unsigned();
             $table->string('username');
             $table->text('message');
@@ -20,7 +21,8 @@ class CreateNotificationsTable extends Migration
 
             $table->index('user_id');
             $table->index('is_read');
-        });
+            });
+        }
     }
 
     public function down()

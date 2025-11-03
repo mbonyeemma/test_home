@@ -13,10 +13,12 @@ class CreateApprovalSettingsTable extends Migration
      */
     public function up()
     {
-        Schema::create('approval_settings', function (Blueprint $table) {
-            $table->increments('id');
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('approval_settings')) {
+            Schema::create('approval_settings', function (Blueprint $table) {
+                $table->increments('id');
+                $table->timestamps();
+            });
+        }
     }
 
     /**

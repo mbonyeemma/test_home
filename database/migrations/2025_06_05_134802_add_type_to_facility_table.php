@@ -13,9 +13,11 @@ class AddTypeToFacilityTable extends Migration
      */
     public function up()
     {
-        Schema::table('facility', function (Blueprint $table) {
-            $table->enum('type', ['PFP', 'PNFP', 'Government'])->after('health_region')->nullable();
-        });
+        if (!Schema::hasColumn('facility', 'type')) {
+            Schema::table('facility', function (Blueprint $table) {
+                $table->enum('type', ['PFP', 'PNFP', 'Government'])->after('health_region')->nullable();
+            });
+        }
     }
 
     /**
