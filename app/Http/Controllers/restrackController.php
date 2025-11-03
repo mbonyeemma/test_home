@@ -1900,19 +1900,16 @@ class restrackController extends Controller
                         continue;
                     }
 
-                    // Validate and sanitize facilityid
                     $facilityid = $packageData['facilityid'] ?? null;
                     if ($facilityid === 'unknown' || !is_numeric($facilityid) || empty($facilityid)) {
-                        $facilityid = 1; // Default facility ID
+                        $facilityid = 1;
                         \Log::warning("Invalid facilityid provided, using default. Original: {$packageData['facilityid']}, Barcode: {$packageData['barcode']}");
                     }
                     
-                    // Convert to integer to ensure it's numeric
                     $facilityid = (int) $facilityid;
                     
-                    // Get the hubid from the facility using parentid
                     $facility = \DB::table('facility')->where('id', $facilityid)->first();
-                    $hubid = $facility ? ($facility->parentid ?: $facility->id) : 1; // Use parentid, or facility's own id if it's a hub, or default to 1
+                    $hubid = $facility ? ($facility->parentid ?: $facility->id) : 1;
                     
                     \Log::info("Saving prepared package. Barcode: {$packageData['barcode']}, FacilityID: {$facilityid}, HubID: {$hubid}");
                     
@@ -1920,22 +1917,17 @@ class restrackController extends Controller
                         'barcode' => $packageData['barcode'],
                         'facilityid' => $facilityid,
                         'hubid' => $hubid,
-                        'final_destination' => $packageData['final_destination'] ?? '888', // Default destination
+                        'final_destination' => $packageData['final_destination'] ?? '888',
                         'created_by' => $packageData['staffId'] ?? 1,
-                        'type' => 1, // Single package type
+                        'type' => 1,
                         'numberofsamples' => $packageData['numbeOfSamples'] ?? $packageData['numberOfSamples'] ?? 1,
                         'is_tracked_from_facility' => 1,
                         'is_batch' => 0,
-                        'status' => 0, // Set status to 0 (waiting for pickup)
+                        'status' => 0,
                         'created_at' => now(),
                         'updated_at' => now()
                     ]);
 
-                    // Note: Prepared packages (status 0) do NOT get movement events
-                    // Movement events are only created when packages are picked up (status 1+)
-                    // This ensures they appear in the "packages awaiting pickup" list
-
-                    // Store package info for notification
                     $savedPackages[] = [
                         'id' => $packageId,
                         'barcode' => $packageData['barcode'],
@@ -1944,7 +1936,6 @@ class restrackController extends Controller
                         'facility_name' => $packageData['facility_name'] ?? 'Unknown Facility'
                     ];
 
-                    // Prepare sample data for notification
                     $samples[] = [
                         'sample_id' => $packageData['barcode'],
                         'sample_name' => $packageData['packageName'] ?? 'Prepared Package'
@@ -2130,13 +2121,78 @@ class restrackController extends Controller
         }
     }
 
-    /**
-     * Get packages awaiting pickup for Pick Sample Package screen
-     */
+    public function getPreparedPackagesForHub($userId)
+    {
+        try {
+            $user = \DB::table('users')->where('id', $userId)->first();
+            
+            if (!$user) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $hubId = $user->hubid;
+
+            $packages = \DB::table('package')
+                ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
+                ->where('package.hubid', $hubId)
+                ->where('package.status', 0)
+                ->select(
+                    'package.id',
+                    'package.barcode',
+                    'package.numberofsamples',
+                    'package.created_at',
+                    'package.status',
+                    'package.final_destination',
+                    'facility.name as facility_name',
+                    'testtypes.name as test_type_name'
+                )
+                ->orderBy('package.created_at', 'desc')
+                ->get();
+
+            $formattedPackages = $packages->map(function ($package) {
+                return [
+                    'id' => $package->id,
+                    'barcode' => $package->barcode,
+                    'packageName' => 'Prepared Package',
+                    'packageType' => 'samples',
+                    'numberOfSamples' => $package->numberofsamples ?? 1,
+                    'facility_name' => $package->facility_name ?? 'Unknown Facility',
+                    'test_type_name' => $package->test_type_name,
+                    'datePrepared' => $package->created_at,
+                    'status' => 'Waiting for Pickup',
+                    'created_at' => $package->created_at,
+                ];
+            });
+
+            \Log::info('Fetched prepared packages for hub', [
+                'user_id' => $userId,
+                'hub_id' => $hubId,
+                'packages_count' => $formattedPackages->count()
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Prepared packages fetched successfully',
+                'packages' => $formattedPackages
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching prepared packages for hub: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function getPackagesAwaitingPickup($userId)
     {
         try {
-            // Get the user's hub to determine which packages they can see
             $user = \DB::table('users')->where('id', $userId)->first();
             if (!$user) {
                 \Log::error('User not found for packages awaiting pickup', ['user_id' => $userId]);
