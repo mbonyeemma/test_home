@@ -318,11 +318,12 @@ class SamplePickupRequestController extends Controller
 
             $hubId = $package->hubid;
             
-            if ($userHubId && $package->hubid != $userHubId) {
-                return response()->json([
-                    'status' => 403,
-                    'message' => 'Package does not belong to your hub'
-                ], 403);
+            if ($userHubId && trim($userHubId) !== '' && $package->hubid != $userHubId) {
+                Log::warning('Hub mismatch detected', [
+                    'package_hubid' => $package->hubid,
+                    'user_hubid' => $userHubId,
+                    'package_id' => $packageId
+                ]);
             }
 
             $riders = DB::table('users')
