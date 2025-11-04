@@ -90,11 +90,6 @@ class NotificationService
 
             \DB::table('notifications')->insert($notificationData);
 
-            Log::info('App notification saved to database', [
-                'username' => $username,
-                'operation' => $operation,
-            ]);
-
             if ($user->fcm_token) {
                 $title = $this->getTitleFromOperation($operation);
                 

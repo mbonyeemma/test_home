@@ -128,7 +128,7 @@ class SamplePickupRequestController extends Controller
             $appNotificationCount = 0;
 
             foreach ($riders as $rider) {
-                if ($rider->email && filter_var($rider->email, FILTER_VALIDATE_EMAIL) && !str_contains($rider->email, '@dev.com')) {
+                if ($rider->email && filter_var($rider->email, FILTER_VALIDATE_EMAIL) && strpos($rider->email, '@dev.com') === false) {
                     try {
                         $riderUser = (object)[
                             'name' => $rider->name,
@@ -393,7 +393,7 @@ class SamplePickupRequestController extends Controller
             $appNotifications = 0;
 
             foreach ($riders as $rider) {
-                if ($rider->email && filter_var($rider->email, FILTER_VALIDATE_EMAIL) && !str_contains($rider->email, '@dev.com')) {
+                if ($rider->email && filter_var($rider->email, FILTER_VALIDATE_EMAIL) && strpos($rider->email, '@dev.com') === false) {
                     try {
                         $riderUser = (object)[
                             'name' => $rider->name,
