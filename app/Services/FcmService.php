@@ -116,6 +116,9 @@ class FcmService
                 return null;
             }
 
+            // Fix private key - replace literal \n with actual newlines
+            $privateKeyFixed = str_replace('\\n', "\n", $serviceAccount['private_key']);
+
             $now = time();
             $exp = $now + 3600;
 
@@ -133,10 +136,13 @@ class FcmService
             ]));
 
             $jwtSignature = '';
-            $privateKey = openssl_pkey_get_private($serviceAccount['private_key']);
+            $privateKey = openssl_pkey_get_private($privateKeyFixed);
             
             if (!$privateKey) {
-                Log::error('Failed to parse private key from service account');
+                Log::error('Failed to parse private key from service account', [
+                    'key_length' => strlen($privateKeyFixed),
+                    'has_begin' => strpos($privateKeyFixed, '-----BEGIN') !== false
+                ]);
                 return null;
             }
             
