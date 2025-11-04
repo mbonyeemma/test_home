@@ -17,36 +17,31 @@
             max-width: 600px;
             margin: 20px auto;
             background: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 30px;
         }
         .header {
-            background: #3498db;
-            color: #ffffff;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
-            margin: -20px -20px 20px -20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
         }
         .header h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 22px;
+            color: #333;
         }
         .content {
-            padding: 20px 0;
+            padding: 10px 0;
         }
         .message-box {
-            background: #f8f9fa;
-            border-left: 4px solid #3498db;
-            padding: 15px;
+            background: #fafafa;
+            padding: 20px;
             margin: 20px 0;
+            border: 1px solid #ddd;
         }
         .footer {
             margin-top: 30px;
             padding-top: 20px;
             border-top: 1px solid #ddd;
-            text-align: center;
             font-size: 12px;
             color: #666;
         }
@@ -69,8 +64,8 @@
         </div>
         
         <div class="footer">
-            <p>&copy; {{ date('Y') }} RESTRACK System. All rights reserved.</p>
-            <p>This is an automated message, please do not reply to this email.</p>
+            <p>RESTRACK System - {{ date('Y') }}</p>
+            <p>This is an automated message. Please do not reply to this email.</p>
         </div>
     </div>
 </body>

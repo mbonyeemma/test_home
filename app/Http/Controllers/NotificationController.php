@@ -24,14 +24,35 @@ class NotificationController extends Controller
             ], 400);
         }
 
-        $notifications = Notification::where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        try {
+            $notifications = Notification::where('user_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->paginate(20);
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $notifications
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'data' => $notifications
+            ]);
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), "doesn't exist") !== false) {
+                return response()->json([
+                    'status' => 'success',
+                    'data' => [
+                        'data' => [],
+                        'total' => 0,
+                        'current_page' => 1,
+                        'per_page' => 20,
+                        'last_page' => 1
+                    ],
+                    'message' => 'Notifications table not yet initialized'
+                ], 200);
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch notifications'
+            ], 500);
+        }
     }
 
     public function getUnread(Request $request)
@@ -45,16 +66,31 @@ class NotificationController extends Controller
             ], 400);
         }
 
-        $notifications = Notification::where('user_id', $userId)
-            ->where('is_read', false)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        try {
+            $notifications = Notification::where('user_id', $userId)
+                ->where('is_read', false)
+                ->orderBy('created_at', 'desc')
+                ->get();
 
-        return response()->json([
-            'status' => 'success',
-            'count' => $notifications->count(),
-            'data' => $notifications
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'count' => $notifications->count(),
+                'data' => $notifications
+            ]);
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), "doesn't exist") !== false) {
+                return response()->json([
+                    'status' => 'success',
+                    'count' => 0,
+                    'data' => []
+                ], 200);
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch unread notifications'
+            ], 500);
+        }
     }
 
     public function markAsRead($id, Request $request)
@@ -138,14 +174,28 @@ class NotificationController extends Controller
             ], 400);
         }
 
-        $unreadCount = Notification::where('user_id', $userId)
-            ->where('is_read', false)
-            ->count();
+        try {
+            $unreadCount = Notification::where('user_id', $userId)
+                ->where('is_read', false)
+                ->count();
 
-        return response()->json([
-            'status' => 'success',
-            'unread_count' => $unreadCount
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'unread_count' => $unreadCount
+            ]);
+        } catch (\Exception $e) {
+            if (strpos($e->getMessage(), "doesn't exist") !== false) {
+                return response()->json([
+                    'status' => 'success',
+                    'unread_count' => 0
+                ], 200);
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch notification count'
+            ], 500);
+        }
     }
 }
 
