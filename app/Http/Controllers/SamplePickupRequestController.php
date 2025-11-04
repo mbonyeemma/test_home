@@ -284,17 +284,51 @@ class SamplePickupRequestController extends Controller
         ]);
     }
 
+    public function viewEligibleRiders()
+    {
+        if (!Auth::user()->hasRole(['hub_coordinator', 'national_hub_coordinator', 'regional_hub_coordinator'])) {
+            return redirect()->route('dashboard.index')->with('error', 'Unauthorized access');
+        }
+
+        $hubId = Auth::user()->hubid;
+
+        $riders = DB::table('users')
+            ->join('role_user', 'users.id', '=', 'role_user.user_id')
+            ->join('roles', 'role_user.role_id', '=', 'roles.id')
+            ->leftJoin('staff', 'users.staff_id', '=', 'staff.id')
+            ->leftJoin('facility', 'users.hubid', '=', 'facility.id')
+            ->where('users.hubid', $hubId)
+            ->whereIn('roles.name', ['sample_transporter', 'special_sample_transportor', 'private_rider'])
+            ->where('users.isactive', 1)
+            ->select(
+                'users.id',
+                'users.name',
+                'users.username',
+                'users.email',
+                'users.isactive',
+                'users.created_at',
+                'roles.name as role_name',
+                'facility.name as hub_name',
+                DB::raw('COALESCE(staff.telephonenumber, 
+                         CASE 
+                             WHEN users.username REGEXP "^[0-9+]" THEN users.username
+                             ELSE NULL 
+                         END) as phone_number'),
+                DB::raw('CONCAT(COALESCE(staff.firstname, ""), " ", COALESCE(staff.lastname, "")) as staff_name')
+            )
+            ->orderBy('users.name')
+            ->get();
+
+        $hubName = DB::table('facility')->where('id', $hubId)->value('name');
+
+        return view('samples.eligible_riders', compact('riders', 'hubName'));
+    }
+
     public function requestRiderApi(Request $request, $packageId)
     {
         try {
             $userId = $request->header('X-User-Id') ?? 1;
             $userHubId = $request->header('X-Hub-Id');
-            
-            Log::info('Rider request initiated via API', [
-                'package_id' => $packageId,
-                'user_id' => $userId,
-                'hub_id' => $userHubId
-            ]);
 
             $package = DB::table('package')
                 ->leftJoin('facility as f', 'package.facilityid', '=', 'f.id')
@@ -317,14 +351,6 @@ class SamplePickupRequestController extends Controller
             }
 
             $hubId = $package->hubid;
-            
-            if ($userHubId && trim($userHubId) !== '' && $package->hubid != $userHubId) {
-                Log::warning('Hub mismatch detected', [
-                    'package_hubid' => $package->hubid,
-                    'user_hubid' => $userHubId,
-                    'package_id' => $packageId
-                ]);
-            }
 
             $riders = DB::table('users')
                 ->join('role_user', 'users.id', '=', 'role_user.user_id')
