@@ -17,48 +17,54 @@
             max-width: 600px;
             margin: 20px auto;
             background: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 30px;
         }
         .header {
-            background: #2ecc71;
-            color: #ffffff;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
-            margin: -20px -20px 20px -20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
         }
         .header h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 22px;
+            color: #333;
         }
         .content {
-            padding: 20px 0;
+            padding: 10px 0;
         }
         .package-info {
-            background: #f8f9fa;
-            border-left: 4px solid #2ecc71;
-            padding: 15px;
+            background: #fafafa;
+            padding: 20px;
             margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        .package-info h3 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
         }
         .package-info table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 15px;
         }
         .package-info td {
-            padding: 8px;
-            border-bottom: 1px solid #dee2e6;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
         }
         .package-info td:first-child {
             font-weight: bold;
-            width: 40%;
+            width: 45%;
+        }
+        .package-info tr:last-child td {
+            border-bottom: none;
         }
         .footer {
             margin-top: 30px;
             padding-top: 20px;
             border-top: 1px solid #ddd;
-            text-align: center;
             font-size: 12px;
             color: #666;
         }
@@ -84,7 +90,7 @@
             @endif
             
             <div class="package-info">
-                <h3 style="margin-top: 0;">Package Details:</h3>
+                <h3>Package Details</h3>
                 <table>
                     @if(isset($packageData['barcode']))
                         <tr>
@@ -123,8 +129,8 @@
         </div>
         
         <div class="footer">
-            <p>&copy; {{ date('Y') }} RESTRACK System. All rights reserved.</p>
-            <p>This is an automated message, please do not reply to this email.</p>
+            <p>RESTRACK System - {{ date('Y') }}</p>
+            <p>This is an automated message. Please do not reply to this email.</p>
         </div>
     </div>
 </body>

@@ -4,26 +4,12 @@
 @section('css')
 <link rel="stylesheet" href="{{ asset('css/jquery.dataTables.min.css') }}">
 <style>
-    .rider-card {
-        background-color: #fff;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 15px;
-        margin-bottom: 10px;
-    }
-    .rider-name {
-        font-size: 16px;
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 5px;
-    }
     .rider-role {
         display: inline-block;
         padding: 3px 10px;
         border-radius: 3px;
         font-size: 11px;
         font-weight: bold;
-        margin-bottom: 8px;
     }
     .role-transporter {
         background-color: #3498db;
@@ -36,19 +22,6 @@
     .role-private {
         background-color: #e67e22;
         color: white;
-    }
-    .contact-info {
-        color: #666;
-        font-size: 13px;
-        margin: 3px 0;
-    }
-    .contact-info i {
-        width: 20px;
-        margin-right: 8px;
-    }
-    .rider-active {
-        color: #27ae60;
-        font-weight: bold;
     }
     .stats-box {
         background-color: #f8f9fa;
@@ -89,12 +62,10 @@ $(document).ready(function() {
 <section class="content">
     <div class="box box-primary">
         <div class="box-header with-border">
-            <h3 class="box-title">
-                <i class="fa fa-motorcycle"></i> Eligible Riders for Pickup Notifications
-            </h3>
+            <h3 class="box-title">Eligible Riders for Pickup Notifications</h3>
             <div class="box-tools pull-right">
                 <a href="{{ route('samples.prepared') }}" class="btn btn-sm btn-default">
-                    <i class="fa fa-arrow-left"></i> Back to Prepared Samples
+                    Back to Prepared Samples
                 </a>
             </div>
         </div>
@@ -119,8 +90,7 @@ $(document).ready(function() {
             </div>
             
             <p style="color: #666; margin-bottom: 20px;">
-                <i class="fa fa-info-circle"></i> 
-                These are the riders who will receive notifications when you click "Request Rider" on prepared packages.
+                These riders will receive notifications when you request pickup for prepared packages.
             </p>
             
             <div class="table-responsive">
@@ -161,27 +131,23 @@ $(document).ready(function() {
                                 </td>
                                 <td>
                                     @if($rider->email)
-                                        <i class="fa fa-envelope" style="color: #3498db;"></i> {{ $rider->email }}
+                                        {{ $rider->email }}
                                     @else
                                         <span style="color: #999;">No email</span>
                                     @endif
                                 </td>
                                 <td>
                                     @if($rider->phone_number)
-                                        <i class="fa fa-phone" style="color: #27ae60;"></i> {{ $rider->phone_number }}
+                                        {{ $rider->phone_number }}
                                     @else
                                         <span style="color: #999;">No phone</span>
                                     @endif
                                 </td>
                                 <td>
                                     @if($rider->isactive)
-                                        <span style="color: #27ae60;">
-                                            <i class="fa fa-check-circle"></i> Active
-                                        </span>
+                                        <span style="color: #27ae60;">Active</span>
                                     @else
-                                        <span style="color: #e74c3c;">
-                                            <i class="fa fa-times-circle"></i> Inactive
-                                        </span>
+                                        <span style="color: #e74c3c;">Inactive</span>
                                     @endif
                                 </td>
                                 <td>{{ date('Y-m-d', strtotime($rider->created_at)) }}</td>
@@ -190,7 +156,6 @@ $(document).ready(function() {
                             <tr>
                                 <td colspan="8" class="text-center">
                                     <p style="padding: 20px; color: #666;">
-                                        <i class="fa fa-exclamation-triangle"></i>
                                         No eligible riders found for your hub. Please contact the administrator.
                                     </p>
                                 </td>

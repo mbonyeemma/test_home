@@ -17,73 +17,77 @@
             max-width: 600px;
             margin: 20px auto;
             background: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 30px;
         }
         .header {
-            background: #f39c12;
-            color: #ffffff;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
-            margin: -20px -20px 20px -20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
         }
         .header h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 22px;
+            color: #333;
         }
-        .urgent-badge {
-            background: #e74c3c;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            display: inline-block;
-            margin-top: 10px;
+        .urgent-note {
+            background: #f8f8f8;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border-left: 3px solid #333;
         }
         .content {
-            padding: 20px 0;
+            padding: 10px 0;
         }
         .package-details {
-            background: #fff3cd;
-            border-left: 4px solid #f39c12;
-            padding: 15px;
+            background: #fafafa;
+            padding: 20px;
             margin: 20px 0;
-            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .package-details h3 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
         }
         .package-details table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 15px;
         }
         .package-details td {
-            padding: 8px;
-            border-bottom: 1px solid #dee2e6;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
         }
         .package-details td:first-child {
             font-weight: bold;
-            width: 40%;
-            color: #856404;
+            width: 45%;
         }
-        .action-box {
-            background: #d4edda;
-            border: 2px solid #28a745;
-            padding: 15px;
+        .package-details tr:last-child td {
+            border-bottom: none;
+        }
+        .instructions {
+            background: #f8f8f8;
+            padding: 20px;
             margin: 20px 0;
-            border-radius: 8px;
-            text-align: center;
         }
-        .action-box h3 {
-            color: #155724;
+        .instructions h3 {
             margin-top: 0;
+            font-size: 16px;
+            color: #333;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
         }
         .footer {
             margin-top: 30px;
             padding-top: 20px;
             border-top: 1px solid #ddd;
-            text-align: center;
             font-size: 12px;
             color: #666;
         }
@@ -92,8 +96,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏍️ Sample Pickup Request</h1>
-            <div class="urgent-badge">ACTION REQUIRED</div>
+            <h1>Sample Pickup Request</h1>
         </div>
         
         <div class="content">
@@ -101,12 +104,16 @@
             
             <p>You have been requested to pick up a sample package from a facility under your hub.</p>
             
+            <div class="urgent-note">
+                <strong>Note:</strong> Samples are time-sensitive. Please prioritize this pickup.
+            </div>
+            
             <div class="package-details">
-                <h3 style="margin-top: 0; color: #856404;">📦 Package Details:</h3>
+                <h3>Package Details</h3>
                 <table>
                     <tr>
                         <td>Package Barcode:</td>
-                        <td><strong style="font-size: 16px;">{{ $packageData['barcode'] }}</strong></td>
+                        <td><strong>{{ $packageData['barcode'] }}</strong></td>
                     </tr>
                     <tr>
                         <td>Pickup Location:</td>
@@ -118,7 +125,7 @@
                     </tr>
                     <tr>
                         <td>Number of Samples:</td>
-                        <td><strong>{{ $packageData['samples'] }}</strong></td>
+                        <td>{{ $packageData['samples'] }}</td>
                     </tr>
                     <tr>
                         <td>Test Type:</td>
@@ -131,25 +138,23 @@
                 </table>
             </div>
             
-            <div class="action-box">
-                <h3>📱 Next Steps</h3>
-                <p style="margin: 10px 0;">
-                    1. Open the RESTRACK mobile app<br>
-                    2. Navigate to "Pick Sample Package"<br>
-                    3. Scan or enter barcode: <strong>{{ $packageData['barcode'] }}</strong><br>
-                    4. Pick up the package from {{ $packageData['facility'] }}<br>
-                    5. Update status after pickup
-                </p>
+            <div class="instructions">
+                <h3>Instructions</h3>
+                <ol>
+                    <li>Open the RESTRACK mobile app</li>
+                    <li>Navigate to "Pick Sample Package"</li>
+                    <li>Scan or enter barcode: <strong>{{ $packageData['barcode'] }}</strong></li>
+                    <li>Pick up the package from {{ $packageData['facility'] }}</li>
+                    <li>Update the status after pickup</li>
+                </ol>
             </div>
             
             <p>Please pick up this package at your earliest convenience.</p>
-            
-            <p style="color: #856404; font-weight: bold;">⚠️ Note: Samples are time-sensitive. Please prioritize this pickup.</p>
         </div>
         
         <div class="footer">
-            <p>&copy; {{ date('Y') }} RESTRACK System. All rights reserved.</p>
-            <p>This is an automated message, please do not reply to this email.</p>
+            <p>RESTRACK System - {{ date('Y') }}</p>
+            <p>This is an automated message. Please do not reply to this email.</p>
         </div>
     </div>
 </body>
