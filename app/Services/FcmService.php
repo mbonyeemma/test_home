@@ -30,6 +30,7 @@ class FcmService
                 return false;
             }
 
+            // Convert all data values to strings (FCM requirement)
             $stringData = [];
             foreach ($data as $key => $value) {
                 $stringData[$key] = (string)$value;
@@ -114,37 +115,6 @@ class FcmService
                 return null;
             }
 
-            if (class_exists('\Google\Auth\Credentials\ServiceAccountCredentials')) {
-                $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
-                    'https://www.googleapis.com/auth/firebase.messaging',
-                    json_decode(file_get_contents($this->serviceAccountPath), true)
-                );
-                
-                $token = $credentials->fetchAuthToken();
-                
-                if (isset($token['access_token'])) {
-                    Log::info('FCM access token obtained successfully via Google Auth');
-                    return $token['access_token'];
-                }
-                
-                Log::error('Failed to get access token from Google Auth', ['response' => $token]);
-                return null;
-            } else {
-                return $this->getAccessTokenManual();
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Error getting FCM access token', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return null;
-        }
-    }
-
-    private function getAccessTokenManual()
-    {
-        try {
             $serviceAccount = json_decode(file_get_contents($this->serviceAccountPath), true);
             
             if (!$serviceAccount) {
@@ -152,41 +122,61 @@ class FcmService
                 return null;
             }
 
-            $privateKey = $serviceAccount['private_key'];
             $now = time();
+            $exp = $now + 3600;
 
-            $header = ['alg' => 'RS256', 'typ' => 'JWT'];
-            $claims = [
+            // Create JWT header
+            $header = json_encode([
+                'alg' => 'RS256',
+                'typ' => 'JWT',
+            ]);
+
+            // Create JWT claims
+            $claims = json_encode([
                 'iss' => $serviceAccount['client_email'],
                 'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
                 'aud' => 'https://oauth2.googleapis.com/token',
                 'iat' => $now,
-                'exp' => $now + 3600,
-            ];
+                'exp' => $exp,
+            ]);
 
-            $headerEncoded = $this->base64UrlEncode(json_encode($header));
-            $claimsEncoded = $this->base64UrlEncode(json_encode($claims));
+            // Encode header and claims
+            $headerEncoded = $this->base64UrlEncode($header);
+            $claimsEncoded = $this->base64UrlEncode($claims);
+            
             $dataToSign = $headerEncoded . '.' . $claimsEncoded;
 
+            // Get private key resource
+            $privateKey = $serviceAccount['private_key'];
             $privateKeyResource = openssl_pkey_get_private($privateKey);
             
             if (!$privateKeyResource) {
-                Log::error('Failed to parse private key');
+                Log::error('Failed to parse private key from service account');
                 return null;
             }
             
+            // Sign the data
             $signature = '';
-            $success = openssl_sign($dataToSign, $signature, $privateKeyResource, OPENSSL_ALGO_SHA256);
+            $success = openssl_sign(
+                $dataToSign,
+                $signature,
+                $privateKeyResource,
+                OPENSSL_ALGO_SHA256
+            );
+            
+            // Free the key resource
             openssl_free_key($privateKeyResource);
 
             if (!$success) {
-                Log::error('Failed to sign JWT');
+                Log::error('Failed to sign JWT with OpenSSL');
                 return null;
             }
 
+            // Encode signature
             $signatureEncoded = $this->base64UrlEncode($signature);
             $jwt = $dataToSign . '.' . $signatureEncoded;
 
+            // Exchange JWT for access token
             $ch = curl_init('https://oauth2.googleapis.com/token');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
@@ -203,19 +193,20 @@ class FcmService
             $data = json_decode($response, true);
 
             if (isset($data['access_token'])) {
-                Log::info('FCM access token obtained successfully (manual JWT)');
+                Log::info('FCM access token obtained successfully');
                 return $data['access_token'];
             }
 
-            Log::error('Failed to get access token (manual)', [
+            Log::error('Failed to get access token from Google', [
                 'http_code' => $httpCode,
                 'response' => $data
             ]);
             return null;
 
         } catch (\Exception $e) {
-            Log::error('Error getting FCM access token (manual)', [
-                'error' => $e->getMessage()
+            Log::error('Error getting FCM access token', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return null;
         }
