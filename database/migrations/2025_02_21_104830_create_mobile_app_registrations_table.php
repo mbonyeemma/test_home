@@ -13,10 +13,12 @@ class CreateMobileAppRegistrationsTable extends Migration
      */
     public function up()
     {
-        Schema::create('mobile_app_registrations', function (Blueprint $table) {
-            $table->increments('id');
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('mobile_app_registrations')) {
+            Schema::create('mobile_app_registrations', function (Blueprint $table) {
+                $table->increments('id');
+                $table->timestamps();
+            });
+        }
     }
 
     /**

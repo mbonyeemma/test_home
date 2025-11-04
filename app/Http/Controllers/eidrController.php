@@ -65,7 +65,7 @@ class eidrController extends Controller {
 					ORDER BY pe.created_at"; 
 					//echo $query; exit;
 		$events = \DB::select($query);*/
-		return response()->json('test1'=>'a','test2'=>'pk');
+		return response()->json(['test1'=>'a','test2'=>'pk']);
 	}
 	public function login(){
 		//

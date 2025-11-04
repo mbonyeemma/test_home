@@ -23,6 +23,7 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack/get/facilities_with_their_hubs/', 'restrackController@getFacilitiesWithTheirHupbs');
 	Route::get('/restrack/get/samples', 'restrackController@getSamples');
 	Route::get('/restrack/get/packages/for/{cat}/id/{id?}', 'restrackController@getPackages');
+	Route::get('/restrack/get/delivered_packages/for/{cat}/id/{id?}', 'restrackController@getDeliveredPackages');
 	Route::post('/restrack/update/package/status', 'restrackController@updadePackageStatus');
 	Route::post('/restrack/login/', 'restrackController@login');
 	Route::post('/restrack/create_package/', 'restrackController@createPackage'); //add noti
@@ -66,7 +67,40 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack/get/syncpackage/{id}', 'restrackController@getPackagesPerDate_byId');
 	Route::post('/restrack_new/register_user/', 'MobileAppRegistrationController@storeUser');
 	Route::get('/restrack_new/packages_per_hub/', 'restrackController@packagesPerHub');
+	
+	Route::get('/restrack_new/check_user_status/{username}', 'MobileAppRegistrationController@checkUserStatus');
+	Route::get('/restrack_new/pending_registrations/', 'MobileAppRegistrationController@getPendingRegistrations');
+	Route::post('/restrack_new/approve_user/{id}', 'MobileAppRegistrationController@approveUser');
+	
+	Route::post('/restrack_new/forgot-password/send-otp', 'ForgotPasswordController@sendOTP');
+	Route::post('/restrack_new/forgot-password/verify-otp', 'ForgotPasswordController@verifyOTP');
+	Route::post('/restrack_new/forgot-password/reset', 'ForgotPasswordController@resetPassword');
+	
+	Route::post('/restrack_new/login/', 'restrackController@login');
+	Route::post('/restrack_new/save-fcm-token/', 'restrackController@saveFcmToken');
+	Route::post('/restrack_new/send_package_invitation/', 'restrackController@sendPackageInvitation');
+	Route::post('/restrack_new/save_prepared_packages/', 'restrackController@savePreparedPackages');
+	Route::get('/restrack_new/get_prepared_packages/user/{userId}', 'restrackController@getPreparedPackages');
+	Route::get('/restrack_new/get_prepared_packages_hub/user/{userId}', 'restrackController@getPreparedPackagesForHub');
+	Route::get('/restrack_new/get_packages_awaiting_pickup/user/{userId}', 'restrackController@getPackagesAwaitingPickup');
+	Route::post('/restrack_new/request_rider/{packageId}', 'SamplePickupRequestController@requestRiderApi');
+
+	// Role switching API routes for mobile app
+	Route::post('/role/switch', 'RoleSwitchController@switchRole');
+	Route::get('/role/current', 'RoleSwitchController@getCurrentRole');
+	Route::get('/role/user-roles', 'RoleSwitchController@getUserRoles');
 
 	Route::get('/forms', 'FormApiController@index');
     Route::get('/forms/{form_id}', 'FormApiController@show');
+    Route::post('/forms/save-data', 'FormApiController@saveData');
+    Route::get('/forms/approved', 'FormApiController@index_status');
+    Route::get('/forms/approved/{form_id}', 'FormApiController@show_status');
+    Route::get('/forms/colors', 'FormApiController@colors');
+
+    Route::get('/notifications', 'NotificationController@index');
+    Route::get('/notifications/unread', 'NotificationController@getUnread');
+    Route::get('/notifications/count', 'NotificationController@getCount');
+    Route::post('/notifications/{id}/read', 'NotificationController@markAsRead');
+    Route::post('/notifications/read-all', 'NotificationController@markAllAsRead');
+    Route::delete('/notifications/{id}', 'NotificationController@delete');
 });

@@ -14,8 +14,10 @@ use \App\Models\User as User;
 use \App\Models\Equipment as Equipment;
 use App\Models\Role;
 use App\SelfRegApproval;
+use App\Mail\AccountApproval;
 use DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class StaffController extends Controller
 {
@@ -154,8 +156,18 @@ class StaffController extends Controller
             return redirect()->back()->with('info', "Approval recorded. Waiting for {$requiredApprovals} total approvals.");
         }
 
+        // Check if user already exists in users table before creating
+        $existingUser = \App\Models\User::where('username', $selfReg->username)
+            ->orWhere('email', $selfReg->email)
+            ->first();
+            
+        if ($existingUser) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'User already exists in system. Cannot approve duplicate registration.');
+        }
+        
         // Enough approvals → create user
-        $user = new User();
+        $user = new \App\Models\User();
         $user->name = $selfReg->name;
         $user->email = $selfReg->email;
         $user->password = $selfReg->password;
@@ -172,25 +184,21 @@ class StaffController extends Controller
 			$user->roles()->attach($role->id); // ✅ attach the actual ID
 		}
 
-        // Update self_reg as active
         DB::update("UPDATE restrackself_reg SET isactive = 1 WHERE id = ?", [$id]);
 
-        // Send notification
         try {
-            $client = new Client();
-            $client->post('https://api.cphl.site/idp/send-notification', [
-                'headers' => [
-                    'Authorization' => 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im1ib255ZWVtbWFAeW1haWwuY29tIiwiYXV0aCI6ImNwaGwiLCJkYXRlIjoiMjAyNS0wNC0wN1QwODo0Mjo0Ny43MzRaIiwiaWF0IjoxNzQ0MDE1MzY3fQ.mMh61xjsVC_ybPQo1bpZtcegvU0Rzk8L1iBMI--bZ54',
-                    'Accept'        => 'application/json',
-                    'Content-Type'  => 'application/json',
-                ],
-                'json' => [
-                    'username'    => $selfReg->username,
-                    'message'     => 'Hello, your account has been approved.',
-                    'sendChannel' => 'EMAIL',
-                    'operation'   => 'ACCOUNT_APPROVAL',
-                ],
-            ]);
+            if ($user->email) {
+                Mail::to($user->email)->send(new AccountApproval($user, true));
+                \Log::info('Account approval email sent to: ' . $user->email);
+            }
+
+            $notifier = new \App\Services\NotificationService();
+            $notifier->sendNotification(
+                $selfReg->username,
+                'Your account has been approved. You can now log in to the RESTRACK system.',
+                'APP',
+                'ACCOUNT_APPROVAL'
+            );
         } catch (\Exception $notifyEx) {
             \Log::error('User approved but notification failed', [
                 'user_id' => $user->id,
@@ -213,13 +221,27 @@ class StaffController extends Controller
         'reason' => 'required|string|max:1000',
     ]);
 
-    // Update record
+    $selfReg = DB::selectOne("SELECT * FROM restrackself_reg WHERE id = ?", [$request->id]);
+
     \DB::table('restrackself_reg')
         ->where('id', $request->id)
         ->update([
             'isactive' => 2,
             'rejection_reason' => $request->reason,
         ]);
+
+    try {
+        if ($selfReg && $selfReg->email) {
+            $user = (object)[
+                'name' => $selfReg->name,
+                'email' => $selfReg->email,
+            ];
+            Mail::to($selfReg->email)->send(new AccountApproval($user, false, $request->reason));
+            \Log::info('Account rejection email sent to: ' . $selfReg->email);
+        }
+    } catch (\Exception $e) {
+        \Log::error('Failed to send rejection email: ' . $e->getMessage());
+    }
 
     return redirect()->back()->with('success', 'User rejected with reason.');
 }
@@ -414,7 +436,10 @@ class StaffController extends Controller
 			$staff->nationalid = $request->nationalid;
 
 			$user = User::where('staff_id', '=', $staff->id)->first();
+			
+			if ($user) {
 			$user->hubid = $request->facilityid;
+			}
 
 			if ($staff->type == 1) {
 				$staff->hasdrivingpermit = $request->hasdrivingpermit;
@@ -425,7 +450,10 @@ class StaffController extends Controller
 			} else {
 				$staff->designation = $request->designation;
 			}
+			
+			if ($user) {
 			$user->save();
+			}
 			$staff->save();
 			return redirect()->route('staff.show', array('id' => $staff->id));
 		} catch (\Exception $e) {

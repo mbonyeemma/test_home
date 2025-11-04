@@ -13,23 +13,28 @@ class CreateFormFieldsTable extends Migration
      */
     public function up()
     {
-        Schema::create('form_fields', function (Blueprint $table) {
-        $table->increments('id'); // replaces $table->id()
+        if (!Schema::hasTable('form_fields') && Schema::hasTable('forms')) {
+            try {
+                Schema::create('form_fields', function (Blueprint $table) {
+                    $table->increments('id');
 
-        $table->unsignedInteger('forms_id'); // replaces foreignId()
-        $table->foreign('forms_id')->references('id')->on('forms')->onDelete('cascade');
+                    $table->unsignedInteger('forms_id');
+                    $table->foreign('forms_id')->references('id')->on('forms')->onDelete('cascade');
 
-        $table->string('field_type'); // input, dropdown, checkbox
-        $table->string('field_name');
-        $table->string('field_value')->nullable();
+                    $table->string('field_type');
+                    $table->string('field_name');
+                    $table->string('field_value')->nullable();
 
-        $table->enum('option', ['mandatory', 'optional'])->default('optional');
-        $table->enum('status', ['enabled', 'disabled'])->default('enabled');
-        $table->text('dropdown_options')->nullable(); // no json() in older MySQL engines
+                    $table->enum('option', ['mandatory', 'optional'])->default('optional');
+                    $table->enum('status', ['enabled', 'disabled'])->default('enabled');
+                    $table->text('dropdown_options')->nullable();
 
-        $table->timestamps();
-});
-
+                    $table->timestamps();
+                });
+            } catch (\Exception $e) {
+                echo "Warning: Could not create form_fields table - " . $e->getMessage() . "\n";
+            }
+        }
     }
 
     /**

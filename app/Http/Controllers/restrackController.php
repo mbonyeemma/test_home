@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Support\Facades\Http;
 use Auth;
 use App\User;
 use Hash;
@@ -66,6 +67,52 @@ class restrackController extends Controller
             return response()->json($re_arranged_user_arr);
         } else {
             return response()->json(['status' => 501, 'status_desc' => 'Login failed, check your password and username']);
+        }
+    }
+
+    public function saveFcmToken(Request $request)
+    {
+        try {
+            $request->validate([
+                'username' => 'required|string',
+                'fcm_token' => 'required|string',
+            ]);
+
+            $user = User::where('username', $request->username)
+                ->orWhere('email', $request->username)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $user->fcm_token = $request->fcm_token;
+            $user->save();
+
+            Log::info('FCM token saved for user', [
+                'user_id' => $user->id,
+                'username' => $user->username,
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'FCM token saved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to save FCM token', [
+                'error' => $e->getMessage(),
+                'username' => $request->username ?? 'unknown',
+            ]);
+
+            return response()->json([
+                'status' => 500,
+                'message' => 'Failed to save FCM token',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -349,6 +396,10 @@ class restrackController extends Controller
                 foreach ($request['barcodes'] as $barcode) {
 
                     $package = Package::where('barcode', '=', $barcode)->first();
+                    if (!$package) {
+                        \Log::warning("Package not found for barcode: " . $barcode);
+                        continue;
+                    }
 
                     $request['source'] = $package->facilityid;
                     if (isset($request['destination']) && $request['destination'] != '') {
@@ -398,14 +449,21 @@ class restrackController extends Controller
         }
     }
 
-    public function updadePackageStatus_new(Request $request)
+    public function updadePackageStatus_new(Request $request, NotificationService $notifier)
     {
         $ret_arr = array();
+        $delivered_packages = []; // Track packages that were delivered for notifications
+        $delivery_facilities = []; // Track unique facilities for notifications
+        
         try {
-            \DB::transaction(function () use ($request, $ret_arr) {
+            \DB::transaction(function () use ($request, $ret_arr, &$delivered_packages, &$delivery_facilities) {
                 //\Log::info($request);
                 foreach ($request['barcodes'] as $barcode) {
-                    $package = Package::where('id', '=', $barcode)->first();
+                    $package = Package::where('barcode', '=', $barcode)->first();
+                    if (!$package) {
+                        \Log::warning("Package not found for barcode: " . $barcode);
+                        continue;
+                    }
                     $request['source'] = $package->facilityid;
                     if (isset($request['destination']) && ($request['destination'] != '' || $request['destination'] == '000')) {
                         $request['final_destination'] = $request['destination'];
@@ -421,10 +479,21 @@ class restrackController extends Controller
                     $request['test_type'] = $package->test_type;
                     $event = $this->createEvent($request, $package->id, $request['status']);
 
-                    //if the status is 2 (delivered) and the event location is the package's final destination, set the deliverer of the package
+                    // Update the package status
+                    $package->status = $request['status'];
+                    $package->save();
+                    
+                    \Log::info("Package status updated - ID: {$package->id}, Barcode: {$package->barcode}, Status: {$request['status']}");
+
+                    //if the status is 2 (delivered), set the deliverer of the package
                     $update_str = '';
-                    if ($request['status']  == 2 && $request['facilityid'] == $package->final_destination) {
+                    if ($request['status']  == 2) {
                         $update_str .= " , delivered_on = '" . $event->created_at . "', delivered_by = " . $request['user_id'];
+                        
+                        // Track delivered packages for notifications
+                        $delivered_packages[] = $package;
+                        // Use the actual facility ID where delivery is happening, not the package ID
+                        $delivery_facilities[$request['facilityid']] = $request['facilityid'];
                     }
                     if ($request['status']  == 3 && $request['facilityid'] == $package->final_destination) {
                         $update_str .= " , received_at_destination_on = '" . $event->created_at . "', received_by = " . $request['user_id'];
@@ -438,16 +507,55 @@ class restrackController extends Controller
                     }
                     //get all children of the packag and update and parent package
                     if ($package->type == 2) {
-                        $query = "UPDATE package SET latest_event_id = " . $event->id . $update_str . " WHERE parent_id = " . $package->id . " OR id = " . $package->id;
+                        $query = "UPDATE package SET latest_event_id = " . $event->id . ", status = " . $request['status'] . $update_str . " WHERE parent_id = " . $package->id . " OR id = " . $package->id;
                     } else {
-                        $package_update_query = "UPDATE package SET latest_event_id = " . $event->id . $update_str . " WHERE id = " . $package->id;
+                        $package_update_query = "UPDATE package SET latest_event_id = " . $event->id . ", status = " . $request['status'] . $update_str . " WHERE id = " . $package->id;
                         \DB::unprepared($package_update_query);
                         $query = "UPDATE samples SET latest_event_id = " . $event->id . " WHERE package_id = " . $package->id;
                     }
-                    //\Log::info($query);
+                    \Log::info("Executing SQL query: " . $query);
                     \DB::unprepared($query);
                 }
             });
+
+            // Send notifications for delivered packages
+            if ($request['status'] == 2 && !empty($delivered_packages)) {
+                foreach ($delivery_facilities as $facility_id) {
+                    try {
+                        $facility = \App\Models\Facility::find($facility_id);
+                        if ($facility && $facility->email) {
+                            $package_count = count($delivered_packages);
+                            $message = "Hello, you have received {$package_count} package(s) delivered to your facility.";
+                            
+                            $notifier->sendNotification(
+                                $facility->email,
+                                $message,
+                                'ALL', // Both email and push notification
+                                'SAMPLE_DELIVERED'
+                            );
+                            
+                            \Log::info('Package delivery notification sent', [
+                                'facility_id' => $facility_id,
+                                'facility_email' => $facility->email,
+                                'package_count' => $package_count,
+                                'packages' => array_map(function($p) { return $p->barcode; }, $delivered_packages)
+                            ]);
+                        } else {
+                            \Log::warning('Package delivery notification not sent: Facility not found or no email', [
+                                'facility_id' => $facility_id,
+                                'packages' => array_map(function($p) { return $p->barcode; }, $delivered_packages)
+                            ]);
+                        }
+                    } catch (\Exception $notifyEx) {
+                        \Log::error('Package delivery notification failed', [
+                            'facility_id' => $facility_id,
+                            'error' => $notifyEx->getMessage(),
+                            'packages' => array_map(function($p) { return $p->barcode; }, $delivered_packages)
+                        ]);
+                    }
+                }
+            }
+
             $ret['status'] = 200;
             $ret['status_desc'] = 'Package status updated successfully';
             return response()->json($ret);
@@ -512,11 +620,12 @@ class restrackController extends Controller
         // SELECT id, barcode FROM package WHERE delivered_on IS NULL AND created_at > '2018-05-29 13:02:44'
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
+        IF(pk.status = 0, 'AWAITING_PICKUP', 
         IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'INTRANSIT')))) as STATUS 
-        FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )";
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
+        FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND pk.created_at" . getTimezoneAwareDateFilter(30);
         // FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
         // (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )
         $db_data = \DB::select($query);
@@ -528,17 +637,20 @@ class restrackController extends Controller
 
     public function getPackagesPerDate_new_id($provided_date)
     {
-        // dd("sdfsdfd");
-        // SELECT id, barcode FROM package WHERE delivered_on IS NULL AND created_at > '2018-05-29 13:02:44'
+        // Use timezone-aware date filtering with buffer to handle timezone differences
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
+        IF(pk.status = 0, 'AWAITING_PICKUP', 
         IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'INTRANSIT')))) as STATUS 
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
-        LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )";
-        // LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
+        LEFT JOIN facility fa ON pk.facilityid = fa.id 
+        WHERE pk.delivered_on IS NULL 
+        AND pk.created_at" . getTimezoneAwarePackageDateFilter() . "
+        ORDER BY pk.created_at DESC";
+        
         $db_data = \DB::select($query);
         $ret_arr = ['samples' => array_values($db_data)];
         $ret_arr['status'] = 200;
@@ -548,18 +660,19 @@ class restrackController extends Controller
 
     public function getPackagesPerDate($provided_date)
     {
-
-        // SELECT id, barcode FROM package WHERE delivered_on IS NULL AND created_at > '2018-05-29 13:02:44'
-        // $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND DATE(created_at) = '" . $provided_date . "'";
+        // Use timezone-aware date filtering with buffer to handle timezone differences
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
+        IF(pk.status = 0, 'AWAITING_PICKUP', 
         IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'INTRANSIT')))) as STATUS 
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
-        LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) between (CURDATE() - INTERVAL 2 WEEK ) and (CURDATE() + 1 )";
-        // -- LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
+        LEFT JOIN facility fa ON pk.facilityid = fa.id 
+        WHERE pk.delivered_on IS NULL 
+        AND pk.created_at" . getTimezoneAwarePackageDateFilter() . "
+        ORDER BY pk.created_at DESC";
 
         $db_data = \DB::select($query);
         $ret_arr = ['samples' => array_values($db_data)];
@@ -570,16 +683,20 @@ class restrackController extends Controller
 
     public function getPackagesPerDate_byId($id)
     {
-        // SELECT id, barcode FROM package WHERE delivered_on IS NULL AND created_at > '2018-05-29 13:02:44'
-        // $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND DATE(created_at) = '" . $provided_date . "'";
+        // Modified to return packages from last 30 days regardless of ID parameter (for mobile app compatibility)
+        // Hardcoded 30-day limit with timezone-aware filtering to handle timezone differences
         $query = "SELECT 
         pk.id, pk.barcode, pk.created_at, pk.facilityid, fa.name, pk.numberofsamples,
-        IF(pk.status = 1, 'PICKED', 
+        IF(pk.status = 0, 'AWAITING_PICKUP', 
+        IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'INTRANSIT', 'INTRANSIT')))) as STATUS 
+        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
-        LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND pk.id > '" . $id . "'";
+        LEFT JOIN facility fa ON pk.facilityid = fa.id 
+        WHERE pk.delivered_on IS NULL 
+        AND pk.created_at BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+        ORDER BY pk.id ASC";
 
         $db_data = \DB::select($query);
         $ret_arr = ['samples' => array_values($db_data)];
@@ -634,25 +751,19 @@ class restrackController extends Controller
         if ($categrory == 'single') {
             $query = "SELECT id, barcode FROM package WHERE barcode = '" . $cat_id . "'";
         } elseif ($categrory == 'all') {
-            $query = "SELECT id, barcode FROM package WHERE created_at between (CURDATE() - INTERVAL 2 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
+            $query = "SELECT id, barcode FROM package WHERE created_at" . getTimezoneAwareDateFilter(60);
         } elseif ($categrory == 'all_undelivered') {
-            $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND created_at between (CURDATE() - INTERVAL 2 MONTH ) and (CURDATE() + 1 )";
+            $query = "SELECT id, barcode, created_at FROM package WHERE delivered_on IS NULL AND created_at" . getTimezoneAwareDateFilter(60);
         } elseif ($categrory == 'user') {
-            //change
-
-            // $query = "SELECT p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id from packagemovement_events pme
-            // INNER JOIN package p ON p.latest_event_id = pme.id
-            // INNER JOIN facility ef ON(pme.location = ef.id)
-            // INNER JOIN facility sf ON(p.facilityid = sf.id)
-            // INNER JOIN facility fd ON(p.final_destination = fd.id)
-            // WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
-            $query = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples from packagemovement_events pme
+            $query1 = "SELECT p.id, p.barcode,sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, 'delivery' as package_type, pme.created_at as event_created_at from packagemovement_events pme
                 INNER JOIN package p ON p.latest_event_id = pme.id
                 INNER JOIN facility ef ON(pme.location = ef.id)
                 INNER JOIN facility sf ON(p.facilityid = sf.id)
                 LEFT JOIN facility fd ON(p.final_destination = fd.id)
                 LEFT JOIN testtypes tt ON (p.test_type = tt.id)
-                WHERE pme.status < 2 AND pme.created_by = " . $cat_id . " AND  pme.created_at between (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + INTERVAL 1 DAY)";
+                WHERE pme.status < 2 AND p.status > 0 AND pme.created_by = " . $cat_id . " AND pme.created_at" . getTimezoneAwareDateFilter(30);
+            
+            $query = $query1 . " ORDER BY event_created_at DESC";
         } else {
             $query = "SELECT p.barcode,sf.name as source_facility,fd.name as final_destination, ef.name as last_location FROM `package` p 
             INNER JOIN packagemovement_events pme ON (p.latest_event_id = pme.id)
@@ -665,6 +776,55 @@ class restrackController extends Controller
         $ret_arr = ['samples' => array_values($db_data)];
         $ret_arr['status'] = 200;
         $ret_arr['status_desc'] = 'Packages fetched successfully';
+        return response()->json($ret_arr);
+    }
+
+    public function getDeliveredPackages($categrory, $cat_id = 0)
+    {
+        //api/restrack/get/delivered_packages/for/{cat}/id/{id}
+        //api/restrack/get/delivered_packages/for/user/id/20
+        //api/restrack/get/delivered_packages/for/facility/id/8
+        //api/restrack/get/delivered_packages/for/hub/id/3
+        
+        if ($categrory == 'user') {
+            // Use package.delivered_by field which is set when package is delivered
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
+                INNER JOIN facility sf ON(p.facilityid = sf.id)
+                LEFT JOIN facility fd ON(p.final_destination = fd.id)
+                LEFT JOIN testtypes tt ON (p.test_type = tt.id)
+                WHERE p.delivered_by = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on" . getTimezoneAwareDateFilter(90) . "
+                ORDER BY p.delivered_on DESC";
+        } elseif ($categrory == 'facility') {
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
+                INNER JOIN facility sf ON(p.facilityid = sf.id)
+                LEFT JOIN facility fd ON(p.final_destination = fd.id)
+                LEFT JOIN testtypes tt ON (p.test_type = tt.id)
+                WHERE p.facilityid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on" . getTimezoneAwareDateFilter(90) . "
+                ORDER BY p.delivered_on DESC";
+        } elseif ($categrory == 'hub') {
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
+                INNER JOIN facility sf ON(p.facilityid = sf.id)
+                LEFT JOIN facility fd ON(p.final_destination = fd.id)
+                LEFT JOIN testtypes tt ON (p.test_type = tt.id)
+                WHERE p.hubid = " . $cat_id . " AND p.delivered_on IS NOT NULL AND p.delivered_on" . getTimezoneAwareDateFilter(90) . "
+                ORDER BY p.delivered_on DESC";
+        } else {
+            $query = "SELECT p.id, p.barcode, sf.name as source_facility, fd.name as final_destination, ef.name as last_location, p.latest_event_id, tt.name as test_name, p.numberofsamples as numberofsamples, p.delivered_on as delivered_at from package p
+                INNER JOIN facility ef ON(p.facilityid = ef.id)
+                INNER JOIN facility sf ON(p.facilityid = sf.id)
+                LEFT JOIN facility fd ON(p.final_destination = fd.id)
+                LEFT JOIN testtypes tt ON (p.test_type = tt.id)
+                WHERE p.delivered_on IS NOT NULL AND p.delivered_on between (CURDATE() - INTERVAL 3 MONTH ) and (CURDATE() + INTERVAL 1 DAY)
+                ORDER BY p.delivered_on DESC";
+        }
+        
+        $db_data = \DB::select($query);
+        $ret_arr = ['samples' => array_values($db_data)];
+        $ret_arr['status'] = 200;
+        $ret_arr['status_desc'] = 'Delivered packages fetched successfully';
         return response()->json($ret_arr);
     }
 
@@ -691,7 +851,9 @@ class restrackController extends Controller
         if ($facility && !empty($results_ids)) {
             $notifier->sendNotification(
                 $facility->email,
-                'Hello, you have received results.'
+                'Hello, you have received results.',
+                'ALL', // Both email and push notification
+                'RESULTS_DELIVERY'
             );
         } else {
             Log::warning('Notification not sent: Hub not found or results missing', [
@@ -1322,6 +1484,15 @@ class restrackController extends Controller
                     'date_picked' => $post_data['date_picked'],
                     'created_by' => $post_data['user_id'],
                 ];
+                
+                // Set is_batch based on whether samples array or number_of_samples is provided
+                if (isset($post_data['samples']) && $post_data['samples'] != '') {
+                    $package_arr['numberofsamples'] = count($post_data['samples']);
+                    $package_arr['is_batch'] = 0;  // Single package with individual samples
+                } else {
+                    $package_arr['numberofsamples'] = $post_data['number_of_samples'];
+                    $package_arr['is_batch'] = 1;  // Batch package
+                }
                 /* initial status should depend on type of user - poe, 0 (waiting pickup) otherwise 1 (in transit)
                 */
                 if (isPoeOrEocUser($post_data['user_id'])) {
@@ -1362,43 +1533,83 @@ class restrackController extends Controller
                     $event_status = $post_data['status'];
                 }
                 $package_arr['is_tracked_from_facility'] = 1;
-                // $package->save(); 
-                if (!Package::where('barcode', '=', $post_data['barcode'])->first()) {
-                    //validate samples
+                $exist_package = Package::where('barcode', '=', $post_data['barcode'])->first();
 
-                    //dd('created object');
-                    $package = Package::create($package_arr);
-                    //now save the event
-                    $event = $this->createEvent($post_data, $package->id, $event_status);
-                    $package->latest_event_id = $event->id;
-                    // if ($package->final_destination == 0) {
-                    //     $package->final_destination = 2490;
-                    // }
-
-                    $package->save();
-                    //update the children with the status of their parent
-                    if (isset($post_data['children']) && $post_data['children'] != '') {
-                        $this->setParentForChildrenPackages($post_data['children'], $package->id, $event->id, $post_data);
-                    }
-                    //in case ther are any samples, save them
-                    if (isset($post_data['samples']) && $post_data['samples'] != '') {
-                        //save each sample
-                        $this->createSamples($post_data, $package->id, $event->id, $hub_id);
-                    }
-                    //add notifications
-                    $facility = Facility::find($package->facilityid);
-
-                    // Check if the hub exists and required values are present
-                    if ($facility) {
-                        $notifier->sendNotification(
-                            $facility->email,
-                            'Hello, package created successfully'
-                        );
+                if ($exist_package != null) {
+                    \Log::info('Package found with barcode: ' . $post_data['barcode'] . ', updating with status: ' . (isset($post_data['status']) ? $post_data['status'] : 'default'));
+                    $package = $exist_package;
+                    
+                    $package->facilityid = $post_data['facilityid'];
+                    $package->hubid = $hub_id;
+                    $package->test_type = $post_data['test_type'];
+                    $package->sample_type = $post_data['sample_type'];
+                    $package->date_picked = $post_data['date_picked'];
+                    $package->created_by = $post_data['user_id'];
+                    
+                    if (isset($post_data['final_destination']) && $post_data['final_destination'] != '') {
+                        $package->final_destination = $post_data['final_destination'];
                     } else {
-                        Log::warning('Notification not sent: Hub not found or results missing', [
-                            'facility'      => $package->facilityid,
-                        ]);
+                        $t_type = TestType::findOrFail($post_data['test_type']);
+                        $package->final_destination = $t_type->ref_lab;
+                        $post_data['final_destination'] = $t_type->ref_lab;
                     }
+                    
+                    if (isset($post_data['children']) && $post_data['children'] != '') {
+                        $package->type = 2;
+                        $event_status = 5;
+                    } else {
+                        $package->type = 1;
+                    }
+                    
+                    if (isset($post_data['samples']) && $post_data['samples'] != '') {
+                        $package->numberofsamples = count($post_data['samples']);
+                        $package->is_batch = 0;
+                    } else {
+                        $package->numberofsamples = $post_data['number_of_samples'];
+                        $package->is_batch = 1;
+                    }
+                    
+                    $package->is_tracked_from_facility = 1;
+                    
+                    if (isset($post_data['status']) && $post_data['status'] != '') {
+                        $event_status = $post_data['status'];
+                        $package->status = $post_data['status']; 
+                    }
+                    
+                } else {
+                    \Log::info('Package not found with barcode: ' . $post_data['barcode'] . ', creating new package');
+                    $package_arr['status'] = $event_status;
+                    $package = Package::create($package_arr);
+                }
+
+                \Log::info('Creating event for package ID: ' . $package->id . ' with status: ' . $event_status);
+                $event = $this->createEvent($post_data, $package->id, $event_status);
+                $package->latest_event_id = $event->id;
+                
+                if ($package->final_destination == 0) {
+                    $package->final_destination = 2490;
+                }
+
+                $package->save();
+                \Log::info('Package saved with ID: ' . $package->id . ', Status: ' . $package->status . ', Barcode: ' . $package->barcode);
+
+                if (isset($post_data['children']) && $post_data['children'] != '') {
+                    $this->setParentForChildrenPackages($post_data['children'], $package->id, $event->id, $post_data);
+                }
+                if (isset($post_data['samples']) && $post_data['samples'] != '') {
+                    $this->createSamples($post_data, $package->id, $event->id, $hub_id);
+                }
+                $facility = Facility::find($package->facilityid);
+
+                if ($facility) {
+                    $notifier->sendNotification(
+                        $facility->email,
+                        'Hello, package created successfully'
+                    );
+                } else {
+                    Log::warning('Notification not sent: Hub not found or results missing', [
+                        'facility'      => $package->facilityid,
+                    ]);
                 }
             });
             $ret['status'] = 200;
@@ -1549,4 +1760,596 @@ class restrackController extends Controller
         $ret_arr['status_desc'] = 'Packages fetched successfully';
         return response()->json($ret_arr);
     }
+
+    public function sendPackageInvitation(Request $request, NotificationService $notifier)
+    {
+        $ret = array();
+        
+        try {
+            $post_data = $request->all();
+            
+            // Validate required fields
+            if (!isset($post_data['package_id']) || !isset($post_data['email']) || !isset($post_data['barcode'])) {
+                $ret['status'] = 400;
+                $ret['status_desc'] = 'Missing required fields: package_id, email, and barcode are required';
+                return response()->json($ret);
+            }
+            
+            // Validate email format
+            if (!filter_var($post_data['email'], FILTER_VALIDATE_EMAIL)) {
+                $ret['status'] = 400;
+                $ret['status_desc'] = 'Invalid email format';
+                return response()->json($ret);
+            }
+            
+            // Prepare invitation data
+            $invitationData = [
+                'package_id' => $post_data['package_id'],
+                'barcode' => $post_data['barcode'],
+                'package_name' => $post_data['package_name'] ?? 'Package',
+                'numbe_of_samples' => $post_data['numbe_of_samples'] ?? '1',
+                'package_type' => $post_data['package_type'] ?? 'Unknown',
+                'facility_name' => $post_data['facility_name'] ?? 'Unknown Facility',
+                'prepared_by' => $post_data['prepared_by'] ?? 'Unknown',
+                'date_prepared' => $post_data['date_prepared'] ?? date('Y-m-d H:i:s'),
+                'email' => $post_data['email']
+            ];
+            
+            // Create invitation record in database
+            $invitation = \DB::table('package_invitations')->insertGetId([
+                'package_id' => $invitationData['package_id'],
+                'barcode' => $invitationData['barcode'],
+                'package_name' => $invitationData['package_name'],
+                'numbe_of_samples' => $invitationData['numbe_of_samples'],
+                'package_type' => $invitationData['package_type'],
+                'facility_name' => $invitationData['facility_name'],
+                'prepared_by' => $invitationData['prepared_by'],
+                'date_prepared' => $invitationData['date_prepared'],
+                'invited_email' => $invitationData['email'],
+                'status' => 'sent',
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+            
+            // Send notification email
+            $subject = 'Package Pickup Invitation - ' . $invitationData['barcode'];
+            $message = $this->buildInvitationMessage($invitationData);
+            
+            $notifier->sendNotification(
+                $invitationData['email'],
+                $message,
+                'EMAIL',
+                'PACKAGE_INVITATION'
+            );
+            
+            $ret['status'] = 200;
+            $ret['status_desc'] = 'Package invitation sent successfully';
+            $ret['invitation_id'] = $invitation;
+            $ret['data'] = $invitationData;
+            
+        } catch (\Exception $e) {
+            \Log::error('Error sending package invitation: ' . $e->getMessage());
+            $ret['status'] = 500;
+            $ret['status_desc'] = 'Failed to send package invitation: ' . $e->getMessage();
+        }
+        
+        return response()->json($ret);
+    }
+    
+    private function buildInvitationMessage($data)
+    {
+        $message = "Hello,\n\n";
+        $message .= "You have been invited to pick up a prepared package with the following details:\n\n";
+        $message .= "Package Barcode: " . $data['barcode'] . "\n";
+        $message .= "Package Name: " . $data['package_name'] . "\n";
+        $message .= "Package Type: " . $data['package_type'] . "\n";
+        $message .= "Number of Samples: " . $data['numbe_of_samples'] . "\n";
+        $message .= "Facility: " . $data['facility_name'] . "\n";
+        $message .= "Prepared By: " . $data['prepared_by'] . "\n";
+        $message .= "Date Prepared: " . $data['date_prepared'] . "\n\n";
+        $message .= "Please use the mobile app to scan the package barcode and pick it up.\n\n";
+        $message .= "Thank you for using the package tracking system.\n\n";
+        $message .= "Best regards,\n";
+        $message .= "Package Tracking System";
+        
+        return $message;
+    }
+
+    /**
+     * Save prepared packages and send notifications
+     */
+    public function savePreparedPackages(Request $request, NotificationService $notifier)
+    {
+        try {
+            $post_data = $request->all();
+            $packages = $post_data['packages'] ?? [];
+            
+            // Validate input data
+            if (empty($packages)) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'No packages provided'
+                ], 400);
+            }
+
+            // Validate that packages is an array
+            if (!is_array($packages)) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Packages must be an array'
+                ], 400);
+            }
+
+            $userId = $post_data['userId'] ?? $post_data['staffId'] ?? 1;
+            $user = \DB::table('users')->where('id', $userId)->first();
+            $userHubId = $user ? $user->hubid : null;
+
+            $savedPackages = [];
+            $samples = [];
+            $errors = [];
+
+            // Save each package to database
+            foreach ($packages as $index => $packageData) {
+                try {
+                    // Validate required fields
+                    if (empty($packageData['barcode'])) {
+                        $errors[] = "Package at index {$index}: Barcode is required";
+                        continue;
+                    }
+
+                    // Check if barcode already exists
+                    $existingPackage = \DB::table('package')->where('barcode', $packageData['barcode'])->first();
+                    if ($existingPackage) {
+                        $errors[] = "Package at index {$index}: Barcode {$packageData['barcode']} already exists";
+                        continue;
+                    }
+
+                    $facilityid = $packageData['facilityid'] ?? null;
+                    if ($facilityid === 'unknown' || !is_numeric($facilityid) || empty($facilityid)) {
+                        $facilityid = 1;
+                    }
+                    
+                    $facilityid = (int) $facilityid;
+                    $hubid = $userHubId ?: 1;
+                    
+                    $packageId = \DB::table('package')->insertGetId([
+                        'barcode' => $packageData['barcode'],
+                        'facilityid' => $facilityid,
+                        'hubid' => $hubid,
+                        'final_destination' => $packageData['final_destination'] ?? '888',
+                        'created_by' => $packageData['staffId'] ?? 1,
+                        'type' => 1,
+                        'numberofsamples' => $packageData['numbeOfSamples'] ?? $packageData['numberOfSamples'] ?? 1,
+                        'is_tracked_from_facility' => 1,
+                        'is_batch' => 0,
+                        'status' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                    $savedPackages[] = [
+                        'id' => $packageId,
+                        'barcode' => $packageData['barcode'],
+                        'packageName' => $packageData['packageName'] ?? 'Prepared Package',
+                        'packageType' => $packageData['packageType'] ?? 'Unknown',
+                        'facility_name' => $packageData['facility_name'] ?? 'Unknown Facility'
+                    ];
+
+                    $samples[] = [
+                        'sample_id' => $packageData['barcode'],
+                        'sample_name' => $packageData['packageName'] ?? 'Prepared Package'
+                    ];
+
+                } catch (\Exception $e) {
+                    $errors[] = "Package at index {$index}: " . $e->getMessage();
+                    \Log::error("Error saving package at index {$index}: " . $e->getMessage());
+                }
+            }
+
+            // If there were errors and no packages were saved, return error
+            if (empty($savedPackages) && !empty($errors)) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Failed to save any packages',
+                    'errors' => $errors
+                ], 400);
+            }
+
+            // Send notification using the notification service (only if packages were saved)
+            $notificationResponse = null;
+            if (!empty($savedPackages)) {
+                $notificationData = [
+                    'username' => $post_data['username'] ?? '07123456789', // Get from request or use default
+                    'title' => 'Pick Samples',
+                    'message' => 'Hello, you have been invited to pick packages. Please check the app and test the one you can access.',
+                    'sendChannel' => 'app',
+                    'operation' => 'INVITE_PICK_SAMPLES',
+                    'templateData' => [
+                        'from_facility' => $packages[0]['facility_name'] ?? 'Unknown Facility',
+                        'to_facility' => 'Makerere University Lab', // You might want to make this configurable
+                        'samples' => $samples
+                    ]
+                ];
+
+                // Call the notification service
+                $notificationResponse = $this->sendNotificationToService($notificationData);
+            }
+            
+            \Log::info('Prepared packages saved and notification sent', [
+                'packages_count' => count($savedPackages),
+                'errors_count' => count($errors),
+                'notification_response' => $notificationResponse
+            ]);
+
+            $response = [
+                'status' => 200,
+                'message' => 'Prepared packages saved successfully',
+                'data' => [
+                    'saved_packages' => $savedPackages,
+                    'saved_count' => count($savedPackages),
+                    'total_requested' => count($packages)
+                ]
+            ];
+
+            // Add errors to response if any
+            if (!empty($errors)) {
+                $response['data']['errors'] = $errors;
+                $response['data']['error_count'] = count($errors);
+            }
+
+            // Add notification response if available
+            if ($notificationResponse) {
+                $response['data']['notification_response'] = $notificationResponse;
+            }
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            \Log::error('Error saving prepared packages: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error saving prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Send notification to external service
+     */
+    private function sendNotificationToService($notificationData)
+    {
+        try {
+            // Use GuzzleHttp for Laravel 5.6 compatibility
+            $client = new \GuzzleHttp\Client();
+            $response = $client->post('https://api.cphl.site/idp/send-notification', [
+                'json' => $notificationData,
+                'timeout' => 30,
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ]);
+            
+            $statusCode = $response->getStatusCode();
+            $body = $response->getBody()->getContents();
+            
+            \Log::info('Notification service response', [
+                'status' => $statusCode,
+                'body' => $body
+            ]);
+
+            return [
+                'status' => $statusCode,
+                'body' => json_decode($body, true)
+            ];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            \Log::error('Error sending notification: ' . $e->getMessage());
+            
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Error sending notification: ' . $e->getMessage());
+            
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get prepared packages for a specific user
+     */
+    public function getPreparedPackages($userId)
+    {
+        try {
+            // Get packages created by the user with facility information
+            $packages = \DB::table('package')
+                ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                ->where('package.created_by', $userId)
+                ->select(
+                    'package.id',
+                    'package.barcode',
+                    'package.numberofsamples',
+                    'package.created_at',
+                    'package.status',
+                    'package.final_destination',
+                    'facility.name as facility_name'
+                )
+                ->orderBy('package.created_at', 'desc')
+                ->get();
+
+            // Format the response
+            $formattedPackages = $packages->map(function ($package) {
+                return [
+                    'id' => $package->id,
+                    'barcode' => $package->barcode,
+                    'packageName' => 'Prepared Package',
+                    'packageType' => 'samples',
+                    'numberOfSamples' => $package->numberofsamples ?? 1,
+                    'facility_name' => $package->facility_name ?? 'Unknown Facility',
+                    'datePrepared' => $package->created_at,
+                    'status' => $package->status == 0 ? 'Waiting for Pickup' : 'Prepared',
+                    'created_at' => $package->created_at,
+                ];
+            });
+
+            \Log::info('Fetched prepared packages for user', [
+                'user_id' => $userId,
+                'packages_count' => $formattedPackages->count()
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Prepared packages fetched successfully',
+                'packages' => $formattedPackages
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching prepared packages: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getPreparedPackagesForHub($userId)
+    {
+        try {
+            $user = \DB::table('users')->where('id', $userId)->first();
+            
+            if (!$user) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $hubId = $user->hubid;
+
+            $packages = \DB::table('package')
+                ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
+                ->where('package.hubid', $hubId)
+                ->where('package.status', 0)
+                ->select(
+                    'package.id',
+                    'package.barcode',
+                    'package.numberofsamples',
+                    'package.created_at',
+                    'package.status',
+                    'package.final_destination',
+                    'facility.name as facility_name',
+                    'testtypes.name as test_type_name'
+                )
+                ->orderBy('package.created_at', 'desc')
+                ->get();
+
+            $formattedPackages = $packages->map(function ($package) {
+                return [
+                    'id' => $package->id,
+                    'barcode' => $package->barcode,
+                    'packageName' => 'Prepared Package',
+                    'packageType' => 'samples',
+                    'numberOfSamples' => $package->numberofsamples ?? 1,
+                    'facility_name' => $package->facility_name ?? 'Unknown Facility',
+                    'test_type_name' => $package->test_type_name,
+                    'datePrepared' => $package->created_at,
+                    'status' => 'Waiting for Pickup',
+                    'created_at' => $package->created_at,
+                ];
+            });
+
+            \Log::info('Fetched prepared packages for hub', [
+                'user_id' => $userId,
+                'hub_id' => $hubId,
+                'packages_count' => $formattedPackages->count()
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Prepared packages fetched successfully',
+                'packages' => $formattedPackages
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching prepared packages for hub: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching prepared packages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getPackagesAwaitingPickup($userId)
+    {
+        try {
+            $user = \DB::table('users')->where('id', $userId)->first();
+            if (!$user) {
+                \Log::error('User not found for packages awaiting pickup', ['user_id' => $userId]);
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'User not found'
+                ], 404);
+            }
+            
+            $userFacilityId = $user->facilityid;
+            \Log::info('User details for packages awaiting pickup', [
+                'user_id' => $userId, 
+                'user_facility_id' => $userFacilityId,
+                'user_hub_id' => $user->hubid,
+                'user_name' => $user->name ?? 'Unknown',
+                'full_user_record' => $user
+            ]);
+            
+            // Debug: Check what packages exist with status 0
+            $debugPackages = \DB::table('package')
+                ->where('package.status', 0)
+                ->select('package.id', 'package.barcode', 'package.hubid', 'package.facilityid', 'package.created_at')
+                ->get();
+            
+            \Log::info('Debug: All packages with status 0', [
+                'count' => $debugPackages->count(),
+                'packages' => $debugPackages->toArray()
+            ]);
+            
+            // If user doesn't have a facility ID, try to get it from hub or use hub-based filtering
+            if (!$userFacilityId) {
+                \Log::warning('User has no facility ID, trying hub-based filtering', [
+                    'user_id' => $userId,
+                    'user_hub_id' => $user->hubid
+                ]);
+                
+                // Try to get packages based on hub instead
+                $userHubId = $user->hubid;
+                if (!$userHubId) {
+                    \Log::error('User has neither facility ID nor hub ID', ['user_id' => $userId]);
+                    return response()->json([
+                        'status' => 200,
+                        'message' => 'No packages awaiting pickup (user has no facility or hub)',
+                        'packages' => []
+                    ]);
+                }
+                
+                // Use hub-based filtering as fallback
+                $packages = \DB::table('package')
+                    ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                    ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
+                    ->where('package.status', 0)
+                    ->where('facility.hubid', $userHubId) // Filter by user's hub
+                    ->whereRaw('package.created_at' . getTimezoneAwareDateFilter(30))
+                    ->whereNotExists(function ($query) {
+                        $query->select(\DB::raw(1))
+                            ->from('packagemovement_events')
+                            ->whereRaw('packagemovement_events.package_id = package.id');
+                    })
+                    ->select(
+                        'package.id',
+                        'package.barcode',
+                        'package.numberofsamples',
+                        'package.created_at',
+                        'package.status',
+                        'package.final_destination',
+                        'package.test_type',
+                        'facility.name as facility_name',
+                        'testtypes.name as test_name'
+                    )
+                    ->orderBy('package.created_at', 'desc')
+                    ->get();
+                    
+                \Log::info('Using hub-based filtering', [
+                    'user_hub_id' => $userHubId,
+                    'packages_found' => $packages->count()
+                ]);
+            } else {
+                // Use facility-based filtering (original logic)
+                $packages = \DB::table('package')
+                    ->leftJoin('facility', 'package.facilityid', '=', 'facility.id')
+                    ->leftJoin('testtypes', 'package.test_type', '=', 'testtypes.id')
+                    ->where('package.status', 0)
+                    ->where('package.facilityid', $userFacilityId) // Filter by user's facility
+                    ->whereRaw('package.created_at' . getTimezoneAwareDateFilter(30))
+                    ->whereNotExists(function ($query) {
+                        $query->select(\DB::raw(1))
+                            ->from('packagemovement_events')
+                            ->whereRaw('packagemovement_events.package_id = package.id');
+                    })
+                    ->select(
+                        'package.id',
+                        'package.barcode',
+                        'package.numberofsamples',
+                        'package.created_at',
+                        'package.status',
+                        'package.final_destination',
+                        'package.test_type',
+                        'facility.name as facility_name',
+                        'testtypes.name as test_name'
+                    )
+                    ->orderBy('package.created_at', 'desc')
+                    ->get();
+            }
+
+            $formattedPackages = $packages->map(function ($package) {
+                return [
+                    'id' => $package->id,
+                    'barcode' => $package->barcode,
+                    'packageId' => $package->id,
+                    'name' => $package->test_name ?? 'Unknown Test',
+                    'hubid' => 1, // Default hub
+                    'numbeOfSamples' => $package->numberofsamples,
+                    'finalDestination' => $package->final_destination ?? '888',
+                    'staffId' => $package->created_by,
+                    'testType' => $package->test_type ?? 1,
+                    'type' => 'samples',
+                    'facilityid' => $package->facilityid,
+                    'placeName' => $package->facility_name,
+                    'longitude' => '0.0',
+                    'latitude' => '0.0',
+                    'datePicked' => $package->created_at,
+                    'samples' => '[]',
+                    'children' => '[]',
+                    'facility_name' => $package->facility_name,
+                    'synched' => 'false',
+                    'preparedBarcodeId' => '',
+                    'parentId' => null,
+                    'testTypeName' => $package->test_name ?? 'Unknown Test',
+                    'selectedType' => 'samples',
+                    'source_facility' => $package->facility_name,
+                    'status' => 'Awaiting Pickup'
+                ];
+            });
+
+            \Log::info('Fetched packages awaiting pickup for user', [
+                'user_id' => $userId,
+                'user_facility_id' => $userFacilityId,
+                'user_hub_id' => $user->hubid,
+                'filtering_method' => $userFacilityId ? 'facility-based' : 'hub-based',
+                'packages_count' => $formattedPackages->count(),
+                'raw_packages_count' => $packages->count()
+            ]);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Packages awaiting pickup fetched successfully',
+                'packages' => $formattedPackages
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching packages awaiting pickup: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching packages awaiting pickup: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
 }
