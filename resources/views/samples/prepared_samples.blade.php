@@ -106,6 +106,9 @@ $(document).ready(function() {
         <div class="box-header with-border">
             <h3 class="box-title">Samples Awaiting Pickup</h3>
             <div class="box-tools pull-right">
+                <a href="{{ route('samples.eligible_riders') }}" class="btn btn-sm btn-info" style="margin-right: 10px;">
+                    <i class="fa fa-users"></i> View Eligible Riders
+                </a>
                 <button type="button" class="btn btn-box-tool" data-widget="collapse">
                     <i class="fa fa-minus"></i>
                 </button>

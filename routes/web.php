@@ -98,6 +98,7 @@ Route::group(['middleware' => 'auth'], function () {
 	Route::get('samples/prepared', 'SamplePickupRequestController@viewPreparedSamples')->name('samples.prepared');
 	Route::post('samples/request-rider/{packageId}', 'SamplePickupRequestController@requestRider')->name('samples.request_rider');
 	Route::get('samples/pickup-requests', 'SamplePickupRequestController@getPickupRequests')->name('samples.pickup_requests');
+	Route::get('samples/eligible-riders', 'SamplePickupRequestController@viewEligibleRiders')->name('samples.eligible_riders');
 
 	Route::get('equipment/down/hubid/{hubid?}/id/{id?}', array(
 		'as' => 'equipment.breakdown',

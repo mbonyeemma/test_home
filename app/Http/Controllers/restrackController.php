@@ -1909,14 +1909,10 @@ class restrackController extends Controller
                     $facilityid = $packageData['facilityid'] ?? null;
                     if ($facilityid === 'unknown' || !is_numeric($facilityid) || empty($facilityid)) {
                         $facilityid = 1;
-                        \Log::warning("Invalid facilityid provided, using default. Original: {$packageData['facilityid']}, Barcode: {$packageData['barcode']}");
                     }
                     
                     $facilityid = (int) $facilityid;
-                    
                     $hubid = $userHubId ?: 1;
-                    
-                    \Log::info("Saving prepared package. Barcode: {$packageData['barcode']}, FacilityID: {$facilityid}, HubID: {$hubid}, UserID: {$userId}");
                     
                     $packageId = \DB::table('package')->insertGetId([
                         'barcode' => $packageData['barcode'],
