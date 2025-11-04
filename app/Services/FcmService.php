@@ -119,12 +119,12 @@ class FcmService
             $now = time();
             $exp = $now + 3600;
 
-            $jwtHeader = base64_encode(json_encode([
+            $jwtHeader = $this->base64UrlEncode(json_encode([
                 'alg' => 'RS256',
                 'typ' => 'JWT',
             ]));
 
-            $jwtClaim = base64_encode(json_encode([
+            $jwtClaim = $this->base64UrlEncode(json_encode([
                 'iss' => $serviceAccount['client_email'],
                 'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
                 'aud' => 'https://oauth2.googleapis.com/token',
@@ -135,40 +135,64 @@ class FcmService
             $jwtSignature = '';
             $privateKey = openssl_pkey_get_private($serviceAccount['private_key']);
             
-            openssl_sign(
+            if (!$privateKey) {
+                Log::error('Failed to parse private key from service account');
+                return null;
+            }
+            
+            $success = openssl_sign(
                 $jwtHeader . '.' . $jwtClaim,
                 $jwtSignature,
                 $privateKey,
                 OPENSSL_ALGO_SHA256
             );
 
-            $jwtSignature = base64_encode($jwtSignature);
+            if (!$success) {
+                Log::error('Failed to sign JWT');
+                return null;
+            }
+
+            $jwtSignature = $this->base64UrlEncode($jwtSignature);
             $jwt = $jwtHeader . '.' . $jwtClaim . '.' . $jwtSignature;
 
             $ch = curl_init('https://oauth2.googleapis.com/token');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
             curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
                 'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
                 'assertion' => $jwt,
             ]));
 
             $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             $data = json_decode($response, true);
 
             if (isset($data['access_token'])) {
+                Log::info('FCM access token obtained successfully');
                 return $data['access_token'];
             }
 
-            Log::error('Failed to get access token from Google', ['response' => $data]);
+            Log::error('Failed to get access token from Google', [
+                'http_code' => $httpCode,
+                'response' => $data
+            ]);
             return null;
 
         } catch (\Exception $e) {
-            Log::error('Error getting FCM access token', ['error' => $e->getMessage()]);
+            Log::error('Error getting FCM access token', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
+    }
+
+    private function base64UrlEncode($data)
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 }
 
