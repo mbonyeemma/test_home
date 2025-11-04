@@ -126,10 +126,11 @@ class NotificationService
         $titles = [
             'ACCOUNT_APPROVAL' => 'Account Approved',
             'PACKAGE_CREATED' => 'New Package',
+            'PICKUP_REQUEST' => 'Sample Pickup Request',
+            'TEST_NOTIFICATION' => 'Test Notification',
             'PACKAGE_DELIVERED' => 'Package Delivered',
             'PACKAGE_RECEIVED' => 'Package Received',
             'PACKAGE_INVITATION' => 'Package Ready',
-            'PICKUP_REQUEST' => 'Pickup Request',
             'PASSWORD_RESET' => 'Password Reset',
             'GENERAL' => 'Notification',
         ];
