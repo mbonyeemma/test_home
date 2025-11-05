@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Storage;
 class FcmService
 {
     private $fcmUrl = 'https://fcm.googleapis.com/v1/projects/restrack-f90a3/messages:send';
+    private $serviceAccountPath;
 
     public function __construct()
     {
+        $this->serviceAccountPath = storage_path('app/firebase-service-account.json');
     }
 
     public function sendPushNotification($fcmToken, $title, $body, $data = [])
@@ -106,13 +108,16 @@ class FcmService
     private function getAccessToken()
     {
         try {
-            $clientEmail = env('FIREBASE_CLIENT_EMAIL');
-            $privateKey = env('FIREBASE_PRIVATE_KEY');
-            
-            if (empty($clientEmail) || empty($privateKey)) {
-                Log::error('Firebase credentials not found in .env');
+            if (!file_exists($this->serviceAccountPath)) {
+                Log::error('Firebase service account file not found', [
+                    'path' => $this->serviceAccountPath
+                ]);
                 return null;
             }
+
+            $serviceAccount = json_decode(file_get_contents($this->serviceAccountPath), true);
+            $clientEmail = $serviceAccount['client_email'];
+            $privateKey = $serviceAccount['private_key'];
 
             $privateKey = str_replace('\\n', "\n", $privateKey);
 
@@ -149,13 +154,24 @@ class FcmService
             $base64UrlSignature = $this->base64UrlEncode($signature);
             $jwt = $signatureInput . '.' . $base64UrlSignature;
 
-            $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            $ch = curl_init('https://oauth2.googleapis.com/token');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
                 'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
                 'assertion' => $jwt
+            ]));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/x-www-form-urlencoded'
             ]);
 
-            if ($response->successful()) {
-                $token = $response->json()['access_token'] ?? null;
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode == 200) {
+                $data = json_decode($response, true);
+                $token = $data['access_token'] ?? null;
                 if ($token) {
                     Log::info('FCM access token obtained successfully');
                     return $token;
@@ -163,8 +179,8 @@ class FcmService
             }
 
             Log::error('Failed to get FCM access token', [
-                'status' => $response->status(),
-                'response' => $response->body()
+                'status' => $httpCode,
+                'response' => $response
             ]);
             return null;
 
