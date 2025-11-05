@@ -105,6 +105,7 @@ class SamplePickupRequestController extends Controller
                                  ELSE NULL 
                              END) as phone_number')
                 )
+                ->distinct()
                 ->get();
 
             if ($riders->isEmpty()) {
@@ -307,7 +308,7 @@ class SamplePickupRequestController extends Controller
                 'users.email',
                 'users.isactive',
                 'users.created_at',
-                'roles.name as role_name',
+                DB::raw('GROUP_CONCAT(DISTINCT roles.name ORDER BY roles.name SEPARATOR ", ") as role_name'),
                 'facility.name as hub_name',
                 DB::raw('COALESCE(staff.telephonenumber, 
                          CASE 
@@ -316,6 +317,7 @@ class SamplePickupRequestController extends Controller
                          END) as phone_number'),
                 DB::raw('CONCAT(COALESCE(staff.firstname, ""), " ", COALESCE(staff.lastname, "")) as staff_name')
             )
+            ->groupBy('users.id', 'users.name', 'users.username', 'users.email', 'users.isactive', 'users.created_at', 'hub_name', 'phone_number', 'staff_name')
             ->orderBy('users.name')
             ->get();
 
@@ -370,6 +372,7 @@ class SamplePickupRequestController extends Controller
                                  ELSE NULL 
                              END) as phone_number')
                 )
+                ->distinct()
                 ->get();
 
             if ($riders->isEmpty()) {
