@@ -8,11 +8,9 @@ use Illuminate\Support\Facades\Storage;
 class FcmService
 {
     private $fcmUrl = 'https://fcm.googleapis.com/v1/projects/restrack-f90a3/messages:send';
-    private $serviceAccountPath;
 
     public function __construct()
     {
-        $this->serviceAccountPath = storage_path('app/firebase-service-account.json');
     }
 
     public function sendPushNotification($fcmToken, $title, $body, $data = [])
@@ -108,46 +106,79 @@ class FcmService
     private function getAccessToken()
     {
         try {
-            if (!file_exists($this->serviceAccountPath)) {
-                Log::error('Firebase service account file not found', [
-                    'path' => $this->serviceAccountPath
-                ]);
-                return null;
-            }
-
-            // Explicitly check if Google Auth is available
-            if (!class_exists('\Google\Auth\Credentials\ServiceAccountCredentials')) {
-                // Manually require the vendor autoload
-                require_once base_path('vendor/autoload.php');
-            }
-
-            if (class_exists('\Google\Auth\Credentials\ServiceAccountCredentials')) {
-                $credentials = new \Google\Auth\Credentials\ServiceAccountCredentials(
-                    'https://www.googleapis.com/auth/firebase.messaging',
-                    json_decode(file_get_contents($this->serviceAccountPath), true)
-                );
-                
-                $token = $credentials->fetchAuthToken();
-                
-                if (isset($token['access_token'])) {
-                    Log::info('FCM access token obtained successfully via Google Auth');
-                    return $token['access_token'];
-                }
-                
-                Log::error('Failed to get access token from Google Auth', ['response' => $token]);
-                return null;
-            }
+            $clientEmail = env('FIREBASE_CLIENT_EMAIL');
+            $privateKey = env('FIREBASE_PRIVATE_KEY');
             
-            Log::error('Google Auth library not available');
+            if (empty($clientEmail) || empty($privateKey)) {
+                Log::error('Firebase credentials not found in .env');
+                return null;
+            }
+
+            $privateKey = str_replace('\\n', "\n", $privateKey);
+
+            $now = time();
+            $exp = $now + 3600;
+
+            $header = [
+                'alg' => 'RS256',
+                'typ' => 'JWT'
+            ];
+
+            $payload = [
+                'iss' => $clientEmail,
+                'sub' => $clientEmail,
+                'aud' => 'https://oauth2.googleapis.com/token',
+                'iat' => $now,
+                'exp' => $exp,
+                'scope' => 'https://www.googleapis.com/auth/firebase.messaging'
+            ];
+
+            $base64UrlHeader = $this->base64UrlEncode(json_encode($header));
+            $base64UrlPayload = $this->base64UrlEncode(json_encode($payload));
+            $signatureInput = $base64UrlHeader . '.' . $base64UrlPayload;
+
+            $privateKeyResource = openssl_pkey_get_private($privateKey);
+            if (!$privateKeyResource) {
+                Log::error('Failed to parse private key');
+                return null;
+            }
+
+            openssl_sign($signatureInput, $signature, $privateKeyResource, OPENSSL_ALGO_SHA256);
+            openssl_free_key($privateKeyResource);
+
+            $base64UrlSignature = $this->base64UrlEncode($signature);
+            $jwt = $signatureInput . '.' . $base64UrlSignature;
+
+            $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+                'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                'assertion' => $jwt
+            ]);
+
+            if ($response->successful()) {
+                $token = $response->json()['access_token'] ?? null;
+                if ($token) {
+                    Log::info('FCM access token obtained successfully');
+                    return $token;
+                }
+            }
+
+            Log::error('Failed to get FCM access token', [
+                'status' => $response->status(),
+                'response' => $response->body()
+            ]);
             return null;
 
         } catch (\Exception $e) {
             Log::error('Error getting FCM access token', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error' => $e->getMessage()
             ]);
             return null;
         }
+    }
+
+    private function base64UrlEncode($data)
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 }
 

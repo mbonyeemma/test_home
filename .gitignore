@@ -8,6 +8,7 @@ Homestead.yaml
 .env
 /storage/framework/views/*
 !/storage/framework/views/.gitignore
+/storage/app/firebase-service-account.json
 database/db_jgibs/hub_db.sql
 hub_db.sql
 
