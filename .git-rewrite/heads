@@ -1,0 +1,15 @@
+refs/heads/dev
+refs/heads/dev2
+refs/heads/dev2-roles
+refs/heads/main
+refs/heads/prod
+refs/heads/sub_main
+refs/remotes/origin/main
+refs/remotes/origin/dev
+refs/remotes/origin/dev2
+refs/remotes/origin/dev2-roles
+refs/remotes/origin/docker-setup
+refs/remotes/origin/main
+refs/remotes/origin/master
+refs/remotes/origin/prod
+refs/remotes/origin/sub_main
