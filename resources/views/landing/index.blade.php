@@ -112,13 +112,21 @@
       url: "{{ url('sampletracking/late_delivery') }}",
       success: function(data) {
         $('#late_delivery').html(data);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error loading late delivery stats:', error);
+        $('#late_delivery').html('Error');
       }
     });
     $.ajax({
       type: 'GET',
       url: "{{ url('sampletracking/covid_stats/2')}}",
       success: function(data) {
-        $('#deliverd').html(data);
+        $('#delivered').html(data);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error loading delivered stats:', error);
+        $('#delivered').html('Error');
       }
     });
     $.ajax({
@@ -126,6 +134,10 @@
       url: "{{ url('sampletracking/covid_stats/3') }}",
       success: function(data) {
         $('#received').html(data);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error loading received stats:', error);
+        $('#received').html('Error');
       }
     });
     $.ajax({
@@ -133,6 +145,10 @@
       url: "{{ url('sampletracking/covid_stats/1') }}",
       success: function(data) {
         $('#in_transit').html(data);
+      },
+      error: function(xhr, status, error) {
+        console.error('Error loading in_transit stats:', error);
+        $('#in_transit').html('Error');
       }
     });
 
@@ -241,7 +257,7 @@
 
       <div class="info-box-content">
         <span class="info-box-text">Delivered this month</span>
-        <span class="info-box-number" id="deliverd"><img class="img-responsive" src="<?php echo asset('img/loading.gif'); ?>" alt="Loading"></span>
+        <span class="info-box-number" id="delivered"><img class="img-responsive" src="<?php echo asset('img/loading.gif'); ?>" alt="Loading"></span>
       </div>
       <!-- /.info-box-content -->
     </div>

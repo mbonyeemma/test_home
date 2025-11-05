@@ -49,6 +49,7 @@ class MobileAppRegistrationController extends Controller
             $user->defensive_driving = $request->defensive_driving;
             $user->bb_training = $request->bb_training;
             $user->hep_b_immunisation = $request->hep_b_immunisation;
+            $user->role = $request->role;
             $user->isactive = 0;
             $user->save();
             
@@ -65,8 +66,29 @@ class MobileAppRegistrationController extends Controller
 
     public function storeUser(Request $request)
     {
-        //
         try {
+            // Check if user already exists in restrackself_reg table
+            $existingRegistration = MobileAppRegistration::where('username', $request->username)
+                ->orWhere('email', $request->email)
+                ->first();
+            
+            if ($existingRegistration) {
+                $ret['status'] = 400;
+                $ret['status_desc'] = 'User with this username or email already exists in registration queue';
+                return response()->json($ret);
+            }
+            
+            // Check if user already exists in users table
+            $existingUser = \App\User::where('username', $request->username)
+                ->orWhere('email', $request->email)
+                ->first();
+            
+            if ($existingUser) {
+                $ret['status'] = 400;
+                $ret['status_desc'] = 'User already exists in system';
+                return response()->json($ret);
+            }
+            
             $user = new MobileAppRegistration;
             $user->username = $request->username;
             $user->name = $request->name;
@@ -78,18 +100,18 @@ class MobileAppRegistrationController extends Controller
             $user->defensive_driving = $request->defensive_driving;
             $user->bb_training = $request->bb_training;
             $user->hep_b_immunisation = $request->hep_b_immunisation;
+            $user->role = $request->role;
             $user->isactive = 0;
             $user->save();
             
-        $ret['status'] = 200;
-        $ret['status_desc'] = 'The User Saved has been successfully, Awaiting Approval';
-        return response()->json($ret);
-    } catch (\Exception $e) {
-        //return redirect()->back()->withErrors(['error' => $e->getMessage()]);
-        $ret['status'] = 501;
-        $ret['status_desc'] = $e->getMessage();
-        return response()->json($ret);
-    }
+            $ret['status'] = 200;
+            $ret['status_desc'] = 'The User Saved has been successfully, Awaiting Approval';
+            return response()->json($ret);
+        } catch (\Exception $e) {
+            $ret['status'] = 501;
+            $ret['status_desc'] = $e->getMessage();
+            return response()->json($ret);
+        }
     }
 
     /**
@@ -127,6 +149,24 @@ class MobileAppRegistrationController extends Controller
             
             $user->save();
 
+            // Assign role to user if role exists in registration
+            if ($registration->role) {
+                // Map registration roles to database roles
+                $roleMapping = [
+                    'rider' => 'sample_transporter',
+                    'driver' => 'driver',
+                    'data_collector' => 'data_collector',
+                    'hub_cordinator' => 'hub_coordinator'
+                ];
+                
+                $mappedRoleName = $roleMapping[$registration->role] ?? $registration->role;
+                $role = \App\Models\Role::where('name', $mappedRoleName)->first();
+                
+                if ($role) {
+                    $user->roles()->attach($role->id);
+                }
+            }
+
             // Update registration status
             $registration->isactive = 1;
             $registration->save();
@@ -136,6 +176,8 @@ class MobileAppRegistrationController extends Controller
                 'status_desc' => 'User approved and transferred successfully. User can now login.',
                 'user_id' => $user->id,
                 'username' => $user->username,
+                'role' => $registration->role,
+                'mapped_role' => $mappedRoleName ?? null,
                 'note' => 'telephone_number stored in registration table only'
             ]);
 

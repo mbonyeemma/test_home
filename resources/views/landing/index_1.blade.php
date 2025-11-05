@@ -230,7 +230,7 @@
           <span class="info-box-icon bg-yellow"><i class="ion ion-stats-bars"></i></span>
 
           <div class="info-box-content">
-            <span class="info-box-text">Delivered this month</span>
+            <span class="info-box-text">Delivered this month1111</span>
             <span class="info-box-number" id="deliverd"><img class="img-responsive" src="<?php echo asset('img/loading.gif'); ?>" alt="Loading"></span>
           </div>
           <!-- /.info-box-content -->

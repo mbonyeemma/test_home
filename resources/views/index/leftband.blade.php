@@ -250,9 +250,15 @@
                     <!-- <li><a href="{{ route('samples.all') }}">All Packages</a></li> -->
                     <!-- <li><a href="{{ route('reports.hubsamples') }}">Samples by Hub</a></li> -->
 
-                    @role(['hub_coordinator'])
+                    @role(['hub_coordinator', 'national_hub_coordinator', 'regional_hub_coordinator'])
                         <li><a href="{{ route('samples.all') }}">My Packages</a></li>
                         <li><a href="{{ route('samples.cphl') }}">My CPHL Packages</a></li>
+                        <li><a href="{{ route('samples.prepared') }}">
+                            <i class="fa fa-motorcycle"></i> Request Sample Pickup
+                            <span class="pull-right-container">
+                                <small class="label pull-right bg-orange">NEW</small>
+                            </span>
+                        </a></li>
                     @endrole
                 </ul>
             </li>

@@ -200,7 +200,7 @@ desired effect
               </div>
             </div>
             <div class="form-group">
-              <label for="dateofweek" class="col-sm-3 control-label">{{ Form::label('dateofweek', 'Date') }}</label>
+              <label for="facilityid" class="col-sm-3 control-label">{{ Form::label('facilityid', 'Facility') }}</label>
               <div class="col-sm-9">
                 {{Form::select('facilityid', array_merge_maintain_keys(array(''=>'Facility'),getFacilitiesforHub(Auth::user()->hubid)), null, ['class'=>'form-control'])}}
               </div>

@@ -322,19 +322,28 @@ group by p.id, p.barcode,df.hubname,pm.status,sp.numberofenvelopes,p.created_at,
 	}
 	public function covid_stats($status)
 	{
-
-		if ($status == 0 || $status == 1) {
-			$query  = 'SELECT sum(numberofsamples) as no FROM package wHERE status = 0 OR status = 1 AND created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE() AND parent_id > 0';
-		} elseif ($status == 2) {
-			$query = 'SELECT sum(numberofsamples) as no FROM package wHERE delivered_by <> 0 AND  created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE() AND parent_id > 0';
-		} elseif ($status == 3) {
-			$query = 'SELECT sum(numberofsamples) as no FROM package p
-			INNER JOIN packagemovement_events pme ON(p.id = pme.package_id) wHERE p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE() AND parent_id > 0 AND p.final_destination = pme.location and pme.status = 3';
-		} else {
-			//do nothing
+		try {
+			if ($status == 0 || $status == 1) {
+				$query  = 'SELECT COALESCE(sum(numberofsamples), 0) as no FROM package WHERE (status = 0 OR status = 1) AND created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE() AND parent_id > 0';
+			} elseif ($status == 2) {
+				// Fixed query for delivered packages - using delivered_on field instead of delivered_by
+				$query = 'SELECT COALESCE(sum(numberofsamples), 0) as no FROM package WHERE delivered_on IS NOT NULL AND delivered_on <> "" AND created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE() AND parent_id > 0';
+			} elseif ($status == 3) {
+				$query = 'SELECT COALESCE(sum(p.numberofsamples), 0) as no FROM package p
+				INNER JOIN packagemovement_events pme ON(p.id = pme.package_id) WHERE p.created_at between (CURDATE() - INTERVAL 1 MONTH ) and CURDATE() AND p.parent_id > 0 AND p.final_destination = pme.location and pme.status = 3';
+			} else {
+				echo "0";
+				return;
+			}
+			
+			$package_samples = \DB::select($query);
+			$result = $package_samples[0]->no ?? 0;
+			echo $result;
+		} catch (\Exception $e) {
+			// Log error and return 0
+			\Log::error('Error in covid_stats: ' . $e->getMessage());
+			echo "0";
 		}
-		$package_samples = \DB::select($query);
-		echo $package_samples[0]->no;
 	}
 	public function receive(Request $request)
 	{
