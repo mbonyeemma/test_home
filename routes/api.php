@@ -84,6 +84,7 @@ Route::group(['middleware' => 'api'], function () {
 	Route::get('/restrack_new/get_prepared_packages_hub/user/{userId}', 'restrackController@getPreparedPackagesForHub');
 	Route::get('/restrack_new/get_packages_awaiting_pickup/user/{userId}', 'restrackController@getPackagesAwaitingPickup');
 	Route::post('/restrack_new/request_rider/{packageId}', 'SamplePickupRequestController@requestRiderApi');
+	Route::get('/restrack_new/get_facility_visits/', 'restrackController@getFacilityVisits');
 
 	// Role switching API routes for mobile app
 	Route::post('/role/switch', 'RoleSwitchController@switchRole');
