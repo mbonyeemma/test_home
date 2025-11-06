@@ -28,11 +28,11 @@ services:
     depends_on:
       - db
     environment:
-      DB_HOST: db
+      DB_HOST: stage-mudax.cn4csa73ps6o.us-east-1.rds.amazonaws.com
       DB_PORT: 3306
       DB_DATABASE: hub_db
-      DB_USERNAME: root
-      DB_PASSWORD: root
+      DB_USERNAME: admin
+      DB_PASSWORD: 5#v-r;yeFh
     mem_limit: 1g
     mem_reservation: 512m
     # Remove health check for now
@@ -63,26 +63,6 @@ services:
     # Add MySQL optimization
     command: --innodb-buffer-pool-size=256M --innodb-log-file-size=64M --max-connections=100
 
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:5.2.1
-    container_name: laravel56-phpmyadmin
-    restart: unless-stopped
-    ports:
-      - "8091:80"
-    environment:
-      PMA_HOST: db
-      PMA_PORT: 3306
-      MYSQL_ROOT_PASSWORD: root
-      UPLOAD_LIMIT: 128M
-      PHP_UPLOAD_MAX_FILESIZE: 128M
-      PHP_POST_MAX_SIZE: 128M
-      # Reasonable PHP memory usage
-      PHP_MEMORY_LIMIT: 256M
-      PHP_MAX_EXECUTION_TIME: 60
-    depends_on:
-      - db
-    mem_limit: 256m
-    mem_reservation: 128m
 
 volumes:
   dbdata:
