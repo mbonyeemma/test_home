@@ -976,6 +976,62 @@ class restrackController extends Controller
         return response()->json($fac_test);
     }
 
+    public function getFacilityVisits(Request $request)
+    {
+        try {
+            $userId = $request->input('user_id') ?? $request->header('X-User-Id');
+            $thedate = $request->input('thedate');
+            
+            if (!$userId) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'User ID is required'
+                ], 400);
+            }
+            
+            if (!$thedate) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Date is required'
+                ], 400);
+            }
+            
+            // Get all facility visits for this user on the specified date
+            $visits = DB::table('checklogin as cl')
+                ->leftJoin('facility as f', 'cl.facilityid', '=', 'f.id')
+                ->where('cl.staffid', $userId)
+                ->where('cl.thedate', $thedate)
+                ->select(
+                    'cl.id',
+                    'cl.facilityid',
+                    'cl.thedate',
+                    'cl.latitude',
+                    'cl.longitude',
+                    'cl.place_name',
+                    'f.name as facility_name'
+                )
+                ->orderBy('cl.id', 'desc')
+                ->get();
+            
+            return response()->json([
+                'status' => 200,
+                'count' => $visits->count(),
+                'visits' => $visits
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error fetching facility visits', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching facility visits: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     // NFT store functionality
     public function storeNftvariables(Request $request)
     {
