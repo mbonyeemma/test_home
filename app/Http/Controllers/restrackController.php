@@ -624,7 +624,7 @@ class restrackController extends Controller
         IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'REFERRED', 'UNKNOWN'))))) as STATUS 
         FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND pk.created_at" . getTimezoneAwareDateFilter(30);
         // FROM package pk LEFT JOIN facility fa ON pk.facilityid = fa.id WHERE pk.delivered_on IS NULL AND DATE(pk.created_at) = '" . $provided_date . "'";
         // (CURDATE() - INTERVAL 1 MONTH ) and (CURDATE() + 1 )
@@ -644,7 +644,7 @@ class restrackController extends Controller
         IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'REFERRED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
@@ -667,7 +667,7 @@ class restrackController extends Controller
         IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'REFERRED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
@@ -691,7 +691,7 @@ class restrackController extends Controller
         IF(pk.status = 1, 'INTRANSIT', 
         IF(pk.status = 2, 'DELIVERED', 
         IF(pk.status = 3,'RECEIVED', 
-        IF(pk.status = 4, 'PICKED', 'UNKNOWN'))))) as STATUS 
+        IF(pk.status = 4, 'REFERRED', 'UNKNOWN'))))) as STATUS 
         FROM package pk 
         LEFT JOIN facility fa ON pk.facilityid = fa.id 
         WHERE pk.delivered_on IS NULL 
