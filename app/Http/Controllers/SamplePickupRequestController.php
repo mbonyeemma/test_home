@@ -18,7 +18,7 @@ class SamplePickupRequestController extends Controller
 
     public function __construct(SmsService $smsService, NotificationService $notificationService)
     {
-        $this->middleware('auth')->except(['requestRiderApi']);
+        $this->middleware('auth')->except(['requestRiderApi', 'getRiderPickupRequests']);
         $this->smsService = $smsService;
         $this->notificationService = $notificationService;
     }
@@ -236,7 +236,16 @@ class SamplePickupRequestController extends Controller
                     'emails_sent' => $emailCount,
                     'sms_sent' => $smsCount,
                     'app_notifications' => $appNotificationCount,
-                ]
+                ],
+                'riders' => $riders->map(function($rider) {
+                    return [
+                        'id' => $rider->id,
+                        'name' => $rider->name,
+                        'email' => $rider->email,
+                        'phone_number' => $rider->phone_number,
+                        'username' => $rider->username,
+                    ];
+                })
             ]);
 
         } catch (\Exception $e) {
@@ -283,6 +292,75 @@ class SamplePickupRequestController extends Controller
             'status' => 'success',
             'data' => $requests
         ]);
+    }
+
+    public function getRiderPickupRequests(Request $request)
+    {
+        try {
+            $userId = $request->header('X-User-Id') ?? $request->input('user_id');
+            $userHubId = $request->header('X-Hub-Id') ?? $request->input('hub_id');
+
+            if (!$userId) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'User ID is required'
+                ], 400);
+            }
+
+            $user = DB::table('users')
+                ->where('id', $userId)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $hubId = $userHubId ?? $user->hubid;
+
+            $requests = DB::table('package_pickup_requests as ppr')
+                ->join('package as p', 'ppr.package_id', '=', 'p.id')
+                ->join('users as u', 'ppr.requested_by', '=', 'u.id')
+                ->join('facility as f', 'p.facilityid', '=', 'f.id')
+                ->leftJoin('testtypes as tt', 'p.test_type', '=', 'tt.id')
+                ->where('ppr.hub_id', $hubId)
+                ->where('p.status', 0)
+                ->select(
+                    'ppr.id as request_id',
+                    'ppr.created_at as requested_at',
+                    'ppr.updated_at',
+                    'p.id as package_id',
+                    'p.barcode',
+                    'p.numberofsamples',
+                    'p.created_at as package_created_at',
+                    'f.name as facility_name',
+                    'u.name as requested_by_name',
+                    'u.id as requested_by_id',
+                    'tt.name as test_type_name'
+                )
+                ->orderBy('ppr.created_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Pickup requests retrieved successfully',
+                'requests' => $requests
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching rider pickup requests', [
+                'user_id' => $userId ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error fetching pickup requests: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function viewEligibleRiders()
@@ -500,7 +578,16 @@ class SamplePickupRequestController extends Controller
                     'emails_sent' => $emailsSent,
                     'sms_sent' => $smsSent,
                     'app_notifications' => $appNotifications,
-                ]
+                ],
+                'riders' => $riders->map(function($rider) {
+                    return [
+                        'id' => $rider->id,
+                        'name' => $rider->name,
+                        'email' => $rider->email,
+                        'phone_number' => $rider->phone_number,
+                        'username' => $rider->username,
+                    ];
+                })
             ]);
 
         } catch (\Exception $e) {
